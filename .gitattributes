@@ -1,0 +1,2 @@
+# Frozen Markdown uses intentional two-space hard line breaks in its approved baseline.
+docs/*.md whitespace=-blank-at-eol

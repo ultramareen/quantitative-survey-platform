@@ -1,0 +1,5 @@
+// Phase 0 configures the approved CockroachDB connector only.
+// Product models and migrations begin in Phase 1 after approval.
+datasource db {
+  provider = "cockroachdb"
+}

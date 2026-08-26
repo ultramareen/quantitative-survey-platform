@@ -1,0 +1,9 @@
+[build]
+  command = "pnpm build"
+  publish = ".next"
+
+[build.environment]
+  NODE_VERSION = "24"
+  PNPM_VERSION = "11.19.0"
+
+# Production deployment is explicitly outside Phase 0.

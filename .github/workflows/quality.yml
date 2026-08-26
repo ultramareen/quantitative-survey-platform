@@ -1,0 +1,31 @@
+name: Phase 0 quality gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: test
+      APP_ORIGIN: http://localhost:3000
+      DATABASE_URL: postgresql://synthetic:synthetic@localhost:26257/test
+      BETTER_AUTH_SECRET: synthetic-ci-secret-that-is-at-least-32-characters
+      LOG_LEVEL: info
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verify

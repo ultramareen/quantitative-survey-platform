@@ -1,0 +1,54 @@
+{
+  "name": "quantitative-survey-platform",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "dev": "node --import tsx scripts/check-env.ts && next dev",
+    "build": "node --import tsx scripts/check-env.ts && next build --webpack",
+    "start": "node --import tsx scripts/check-env.ts && next start",
+    "config:check": "node --import tsx scripts/check-env.ts",
+    "typecheck": "tsc --noEmit",
+    "docs:check": "node scripts/check-frozen-docs.mjs",
+    "lint": "node scripts/check-frozen-docs.mjs && eslint . --max-warnings=0 && node scripts/check-frozen-docs.mjs",
+    "lint:fix": "node scripts/check-frozen-docs.mjs && eslint . --fix --ignore-pattern 'docs/**' && node scripts/check-frozen-docs.mjs",
+    "format": "node scripts/check-frozen-docs.mjs && prettier --write . && node scripts/check-frozen-docs.mjs",
+    "format:check": "node scripts/check-frozen-docs.mjs && prettier --check . && node scripts/check-frozen-docs.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:boundaries": "vitest run tests/architecture",
+    "test:bundle": "node --import tsx scripts/check-client-bundle.ts",
+    "prisma:validate": "prisma validate",
+    "verify": "node scripts/check-frozen-docs.mjs && tsc --noEmit && eslint . --max-warnings=0 && prettier --check . && vitest run && prisma validate && node --import tsx scripts/check-env.ts && next build --webpack && node --import tsx scripts/check-client-bundle.ts && node scripts/check-frozen-docs.mjs"
+  },
+  "dependencies": {
+    "next": "16.3.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "server-only": "0.0.1",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@next/env": "16.3.3",
+    "@tailwindcss/postcss": "4.3.3",
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.2",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.3",
+    "jsdom": "30.0.1",
+    "prettier": "3.9.6",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "prisma": "7.10.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "^4.21.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.11"
+  }
+}

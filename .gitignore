@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Next.js build output
+.next/
+out/
+
+# Test and tooling output
+coverage/
+*.tsbuildinfo
+
+# Environment files: examples are placeholders only.
+.env
+.env.*
+!.env.example
+
+# Generated Prisma client and migrations are introduced in later phases.
+generated/
+prisma/migrations/
+
+# Logs and local editor/OS files
+*.log
+.DS_Store
+.idea/
+.vscode/
