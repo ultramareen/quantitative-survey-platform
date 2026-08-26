@@ -93,13 +93,20 @@ describe("module boundaries", () => {
     expect(violations).toEqual([]);
   });
 
-  it("configures CockroachDB without Phase 1 models or migrations", async () => {
+  it("configures the approved Phase 1 CockroachDB models and migrations", async () => {
     const schema = await readFile(
       join(root, "prisma", "schema.prisma"),
       "utf8",
     );
     expect(schema).toContain('provider = "cockroachdb"');
-    expect(schema).not.toMatch(/^model\s/m);
-    await expect(stat(join(root, "prisma", "migrations"))).rejects.toThrow();
+    expect(schema).toMatch(/^model User\s/m);
+    expect(schema).toMatch(/^model ResponseAttempt\s/m);
+    expect(schema).toMatch(/^model ResultsSnapshot\s/m);
+    expect(schema).not.toMatch(/^model (Answer|AnswerSelection)\s/m);
+
+    const migrations = (await readdir(join(root, "prisma", "migrations")))
+      .filter((name) => /^\d{12}_/.test(name))
+      .sort();
+    expect(migrations).toHaveLength(9);
   });
 });

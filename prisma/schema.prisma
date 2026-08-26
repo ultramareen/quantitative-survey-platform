@@ -1,5 +1,475 @@
-// Phase 0 configures the approved CockroachDB connector only.
-// Product models and migrations begin in Phase 1 after approval.
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
 datasource db {
   provider = "cockroachdb"
+}
+
+enum EmployeeRole {
+  PRODUCT_MANAGER
+  RESEARCHER
+  ADMIN
+}
+
+enum InvitationStatus {
+  PENDING
+  REGISTERED
+  DISABLED
+}
+
+enum SurveyStatus {
+  DRAFT
+  ACTIVE
+  PENDING_CAPACITY
+  COMPLETED
+}
+
+enum SurveyPauseReason {
+  MANUAL
+  INFRASTRUCTURE_CAPACITY
+}
+
+enum QuestionType {
+  SINGLE_CHOICE
+  MULTIPLE_CHOICE
+  FREE_TEXT
+}
+
+enum PublicSessionCreationStatus {
+  ACTIVE
+  PENDING_CAPACITY
+}
+
+enum ResponseAttemptStatus {
+  CURRENT
+  ARCHIVED
+}
+
+enum ResponseArchiveReason {
+  REPLACED
+  SECURITY_REVOKED
+  RETENTION
+}
+
+enum AuditResult {
+  SUCCESS
+  DENIED
+  FAILED
+}
+
+enum InfrastructureUsageSource {
+  ESTIMATED
+  MANUAL_ACTUAL
+  PROVIDER_ACTUAL
+}
+
+enum InfrastructureAlertStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum InfrastructureProtectionState {
+  NORMAL
+  WARNING
+  CRITICAL
+}
+
+model User {
+  id                   String       @id @default(uuid()) @db.Uuid
+  emailNormalized      String       @unique(map: "users_email_normalized_key") @map("email_normalized") @db.String(320)
+  displayName          String       @map("display_name") @db.String(200)
+  emailVerified        Boolean      @default(false) @map("email_verified")
+  role                 EmployeeRole
+  authorizationVersion Int          @default(1) @map("authorization_version")
+  disabledAt           DateTime?    @map("disabled_at") @db.Timestamptz(6)
+  createdAt            DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  authAccounts             AuthAccount[]
+  authSessions             AuthSession[]
+  passwordResetTokens      PasswordResetToken[]
+  invitationsReceived      EmployeeInvitation[]          @relation("InvitationRegisteredUser")
+  invitationsCreated       EmployeeInvitation[]          @relation("InvitationInviter")
+  invitationsDisabled      EmployeeInvitation[]          @relation("InvitationDisabler")
+  surveysOwned             Survey[]                      @relation("SurveyOwner")
+  surveysTombstoned        Survey[]                      @relation("SurveyTombstonedBy")
+  resultsSnapshotsCreated  ResultsSnapshot[]             @relation("ResultsSnapshotCreator")
+  auditEvents              AuditEvent[]                  @relation("AuditActor")
+  infrastructureAlertsSent InfrastructureAlertDelivery[] @relation("InfrastructureAlertSentBy")
+
+  @@index([disabledAt], map: "users_disabled_at_idx")
+  @@map("users")
+}
+
+model AuthAccount {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  issuer       String   @default("local") @db.String(100)
+  providerId   String   @default("credential") @map("provider_id") @db.String(100)
+  accountId    String   @map("account_id") @db.String(320)
+  passwordHash String   @map("password_hash") @db.String(512)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([issuer, accountId], map: "auth_accounts_issuer_account_id_key")
+  @@index([userId], map: "auth_accounts_user_id_idx")
+  @@map("auth_accounts")
+}
+
+model AuthSession {
+  id                   String    @id @default(uuid()) @db.Uuid
+  userId               String    @map("user_id") @db.Uuid
+  tokenHash            Bytes     @unique(map: "auth_sessions_token_hash_key") @map("token_hash") @db.Bytes
+  authorizationVersion Int       @map("authorization_version")
+  idleExpiresAt        DateTime  @map("idle_expires_at") @db.Timestamptz(6)
+  absoluteExpiresAt    DateTime  @map("absolute_expires_at") @db.Timestamptz(6)
+  lastSeenAt           DateTime  @map("last_seen_at") @db.Timestamptz(6)
+  revokedAt            DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt            DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([userId, revokedAt], map: "auth_sessions_user_revoked_idx")
+  @@index([idleExpiresAt], map: "auth_sessions_idle_expires_at_idx")
+  @@index([absoluteExpiresAt], map: "auth_sessions_absolute_expires_at_idx")
+  @@map("auth_sessions")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash Bytes     @unique(map: "password_reset_tokens_token_hash_key") @map("token_hash") @db.Bytes
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([expiresAt], map: "password_reset_tokens_expires_at_idx")
+  @@map("password_reset_tokens")
+}
+
+model EmployeeInvitation {
+  id               String           @id @default(uuid()) @db.Uuid
+  emailNormalized  String           @unique(map: "employee_invitations_email_normalized_key") @map("email_normalized") @db.String(320)
+  assignedRole     EmployeeRole     @map("assigned_role")
+  status           InvitationStatus @default(PENDING)
+  registeredUserId String?          @unique(map: "employee_invitations_registered_user_id_key") @map("registered_user_id") @db.Uuid
+  invitedById      String           @map("invited_by_id") @db.Uuid
+  disabledById     String?          @map("disabled_by_id") @db.Uuid
+  registeredAt     DateTime?        @map("registered_at") @db.Timestamptz(6)
+  disabledAt       DateTime?        @map("disabled_at") @db.Timestamptz(6)
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  registeredUser User? @relation("InvitationRegisteredUser", fields: [registeredUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  invitedBy      User  @relation("InvitationInviter", fields: [invitedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  disabledBy     User? @relation("InvitationDisabler", fields: [disabledById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([status], map: "employee_invitations_status_idx")
+  @@map("employee_invitations")
+}
+
+model Survey {
+  id             String             @id @default(uuid()) @db.Uuid
+  publicId       String             @unique(map: "surveys_public_id_key") @map("public_id") @db.String(64)
+  ownerId        String             @map("owner_id") @db.Uuid
+  title          String             @db.String(300)
+  description    String?            @db.String(4000)
+  status         SurveyStatus       @default(DRAFT)
+  pauseReason    SurveyPauseReason? @map("pause_reason")
+  stateVersion   Int                @default(1) @map("state_version")
+  questionCount  Int                @default(0) @map("question_count") @db.Int2
+  launchedAt     DateTime?          @map("launched_at") @db.Timestamptz(6)
+  pausedAt       DateTime?          @map("paused_at") @db.Timestamptz(6)
+  completedAt    DateTime?          @map("completed_at") @db.Timestamptz(6)
+  stateChangedAt DateTime           @default(now()) @map("state_changed_at") @db.Timestamptz(6)
+  tombstonedAt   DateTime?          @map("tombstoned_at") @db.Timestamptz(6)
+  tombstonedById String?            @map("tombstoned_by_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner            User                  @relation("SurveyOwner", fields: [ownerId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  tombstonedBy     User?                 @relation("SurveyTombstonedBy", fields: [tombstonedById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  questions        Question[]
+  publicSessions   PublicSurveySession[]
+  respondents      Respondent[]
+  responseAttempts ResponseAttempt[]
+  resultsSnapshots ResultsSnapshot[]
+  auditEvents      AuditEvent[]
+
+  @@index([ownerId, status], map: "surveys_owner_status_idx")
+  @@index([status, tombstonedAt], map: "surveys_status_tombstoned_idx")
+  @@index([tombstonedAt], map: "surveys_tombstoned_at_idx")
+  @@map("surveys")
+}
+
+model Question {
+  id        String       @id @default(uuid()) @db.Uuid
+  surveyId  String       @map("survey_id") @db.Uuid
+  position  Int          @db.Int2
+  type      QuestionType
+  prompt    String       @db.String(4000)
+  required  Boolean      @default(false)
+  createdAt DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  survey  Survey         @relation(fields: [surveyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  options AnswerOption[]
+
+  @@unique([surveyId, position], map: "questions_survey_id_position_key")
+  @@unique([id, surveyId], map: "questions_id_survey_id_key")
+  @@index([surveyId], map: "questions_survey_id_idx")
+  @@map("questions")
+}
+
+model AnswerOption {
+  id         String   @id @default(uuid()) @db.Uuid
+  questionId String   @map("question_id") @db.Uuid
+  surveyId   String   @map("survey_id") @db.Uuid
+  position   Int      @db.Int2
+  label      String   @db.String(1000)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  question Question @relation(fields: [questionId, surveyId], references: [id, surveyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([questionId, position], map: "answer_options_question_id_position_key")
+  @@index([surveyId], map: "answer_options_survey_id_idx")
+  @@map("answer_options")
+}
+
+model PublicSurveySession {
+  id                 String                      @id @default(uuid()) @db.Uuid
+  surveyId           String                      @map("survey_id") @db.Uuid
+  respondentId       String?                     @map("respondent_id") @db.Uuid
+  openTokenHash      Bytes                       @unique(map: "public_survey_sessions_open_token_hash_key") @map("open_token_hash") @db.Bytes
+  createdWhileStatus PublicSessionCreationStatus @map("created_while_status")
+  firstOpenedAt      DateTime                    @default(now()) @map("first_opened_at") @db.Timestamptz(6)
+  lastSeenAt         DateTime                    @map("last_seen_at") @db.Timestamptz(6)
+  invalidatedAt      DateTime?                   @map("invalidated_at") @db.Timestamptz(6)
+
+  survey           Survey            @relation(fields: [surveyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  respondent       Respondent?       @relation(fields: [respondentId, surveyId], references: [id, surveyId], onDelete: Restrict, onUpdate: Restrict)
+  responseAttempts ResponseAttempt[]
+
+  @@unique([id, surveyId], map: "public_survey_sessions_id_survey_id_key")
+  @@index([surveyId, firstOpenedAt], map: "public_survey_sessions_survey_opened_idx")
+  @@index([respondentId], map: "public_survey_sessions_respondent_id_idx")
+  @@map("public_survey_sessions")
+}
+
+model Respondent {
+  id                    String    @id @default(uuid()) @db.Uuid
+  surveyId              String    @map("survey_id") @db.Uuid
+  referenceId           String    @unique(map: "respondents_reference_id_key") @map("reference_id") @db.String(15)
+  nameCiphertext        Bytes?    @map("name_ciphertext") @db.Bytes
+  nameNonce             Bytes?    @map("name_nonce") @db.Bytes
+  nameKeyVersion        Int?      @map("name_key_version")
+  phoneCiphertext       Bytes?    @map("phone_ciphertext") @db.Bytes
+  phoneNonce            Bytes?    @map("phone_nonce") @db.Bytes
+  phoneKeyVersion       Int?      @map("phone_key_version")
+  phoneLookupHash       Bytes?    @map("phone_lookup_hash") @db.Bytes
+  phoneLookupKeyVersion Int?      @map("phone_lookup_key_version")
+  identifiedAt          DateTime  @default(now()) @map("identified_at") @db.Timestamptz(6)
+  lastActivityAt        DateTime  @map("last_activity_at") @db.Timestamptz(6)
+  anonymizedAt          DateTime? @map("anonymized_at") @db.Timestamptz(6)
+  retentionExpiresAt    DateTime? @map("retention_expires_at") @db.Timestamptz(6)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  survey         Survey                @relation(fields: [surveyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  publicSessions PublicSurveySession[]
+  attempts       ResponseAttempt[]
+
+  @@unique([id, surveyId], map: "respondents_id_survey_id_key")
+  @@index([surveyId, identifiedAt], map: "respondents_survey_identified_idx")
+  @@map("respondents")
+}
+
+model ResponseAttempt {
+  id                    String                 @id @default(uuid()) @db.Uuid
+  surveyId              String                 @map("survey_id") @db.Uuid
+  respondentId          String                 @map("respondent_id") @db.Uuid
+  publicSurveySessionId String                 @map("public_survey_session_id") @db.Uuid
+  status                ResponseAttemptStatus  @default(CURRENT)
+  generation            Int
+  attemptNumber         Int                    @map("attempt_number")
+  attemptTokenHash      Bytes?                 @unique(map: "response_attempts_attempt_token_hash_key") @map("attempt_token_hash") @db.Bytes
+  payloadCiphertext     Bytes                  @map("payload_ciphertext") @db.Bytes
+  payloadNonce          Bytes                  @map("payload_nonce") @db.Bytes
+  payloadKeyVersion     Int                    @map("payload_key_version")
+  payloadSchemaVersion  Int                    @map("payload_schema_version")
+  revision              Int                    @default(0)
+  lastMutationId        String?                @map("last_mutation_id") @db.Uuid
+  saveCount             Int                    @default(0) @map("save_count")
+  answeredQuestionCount Int                    @default(0) @map("answered_question_count") @db.Int2
+  coverageBasisCount    Int                    @map("coverage_basis_count") @db.Int2
+  createdAt             DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  startedAt             DateTime?              @map("started_at") @db.Timestamptz(6)
+  lastActivityAt        DateTime               @map("last_activity_at") @db.Timestamptz(6)
+  lastAnswerChangedAt   DateTime?              @map("last_answer_changed_at") @db.Timestamptz(6)
+  archivedAt            DateTime?              @map("archived_at") @db.Timestamptz(6)
+  archiveReason         ResponseArchiveReason? @map("archive_reason")
+
+  survey              Survey              @relation(fields: [surveyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  respondent          Respondent          @relation(fields: [respondentId, surveyId], references: [id, surveyId], onDelete: Restrict, onUpdate: Restrict)
+  publicSurveySession PublicSurveySession @relation(fields: [publicSurveySessionId, surveyId], references: [id, surveyId], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([respondentId, attemptNumber], map: "response_attempts_respondent_attempt_number_key")
+  @@index([surveyId, status], map: "response_attempts_survey_status_idx")
+  @@index([publicSurveySessionId], map: "response_attempts_public_session_idx")
+  @@map("response_attempts")
+}
+
+model ResultsSnapshot {
+  id                   String   @id @default(uuid()) @db.Uuid
+  surveyId             String   @map("survey_id") @db.Uuid
+  createdById          String   @map("created_by_id") @db.Uuid
+  snapshotNumber       Int      @map("snapshot_number")
+  dataCutoffSystemTime String   @map("data_cutoff_system_time") @db.String(64)
+  dataCutoffAt         DateTime @map("data_cutoff_at") @db.Timestamptz(6)
+  openedCount          Int      @map("opened_count")
+  identifiedCount      Int      @map("identified_count")
+  startedCount         Int      @map("started_count")
+  greaterThanHalfCount Int      @map("greater_than_half_count")
+  completedCount       Int      @map("completed_count")
+  aggregateResults     Json     @map("aggregate_results") @db.JsonB
+  freeTextCiphertext   Bytes?   @map("free_text_ciphertext") @db.Bytes
+  freeTextNonce        Bytes?   @map("free_text_nonce") @db.Bytes
+  freeTextKeyVersion   Int?     @map("free_text_key_version")
+  schemaVersion        Int      @map("schema_version")
+  sourceFingerprint    Bytes?   @map("source_fingerprint") @db.Bytes
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  survey    Survey @relation(fields: [surveyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  createdBy User   @relation("ResultsSnapshotCreator", fields: [createdById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([surveyId, snapshotNumber], map: "results_snapshots_survey_snapshot_number_key")
+  @@index([surveyId, createdAt(sort: Desc)], map: "results_snapshots_survey_latest_idx")
+  @@map("results_snapshots")
+}
+
+model InfrastructureUsageSnapshot {
+  id           String                    @id @default(uuid()) @db.Uuid
+  provider     String                    @db.String(64)
+  quotaKey     String                    @map("quota_key") @db.String(128)
+  periodKey    String                    @map("period_key") @db.String(64)
+  usedUnits    Decimal                   @map("used_units") @db.Decimal(30, 9)
+  limitUnits   Decimal                   @map("limit_units") @db.Decimal(30, 9)
+  usagePercent Decimal                   @map("usage_percent") @db.Decimal(8, 4)
+  source       InfrastructureUsageSource
+  safeDetails  Json?                     @map("safe_details") @db.JsonB
+  collectedAt  DateTime                  @map("collected_at") @db.Timestamptz(6)
+  createdAt    DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([provider, quotaKey, collectedAt(sort: Desc)], map: "infrastructure_usage_latest_idx")
+  @@map("infrastructure_usage_snapshots")
+}
+
+model InfrastructureEstimateBucket {
+  id               String   @id @default(uuid()) @db.Uuid
+  provider         String   @db.String(64)
+  quotaKey         String   @map("quota_key") @db.String(128)
+  periodKey        String   @map("period_key") @db.String(64)
+  bucketStartedAt  DateTime @map("bucket_started_at") @db.Timestamptz(6)
+  requestCount     BigInt   @default(0) @map("request_count")
+  executionMillis  Decimal  @default(0) @map("execution_millis") @db.Decimal(30, 3)
+  responseBytes    BigInt   @default(0) @map("response_bytes")
+  estimatedUnits   Decimal  @default(0) @map("estimated_units") @db.Decimal(30, 9)
+  estimatorVersion Int      @map("estimator_version")
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([provider, quotaKey, periodKey, bucketStartedAt], map: "infrastructure_estimate_bucket_key")
+  @@map("infrastructure_estimate_buckets")
+}
+
+model InfrastructureDeployment {
+  id                   String   @id @default(uuid()) @db.Uuid
+  provider             String   @db.String(64)
+  providerDeploymentId String   @map("provider_deployment_id") @db.String(255)
+  production           Boolean  @default(false)
+  observedAt           DateTime @map("observed_at") @db.Timestamptz(6)
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([provider, providerDeploymentId], map: "infrastructure_deployment_provider_key")
+  @@index([production, observedAt(sort: Desc)], map: "infrastructure_deployment_production_idx")
+  @@map("infrastructure_deployments")
+}
+
+model InfrastructureAlertDelivery {
+  id            String                    @id @default(uuid()) @db.Uuid
+  provider      String                    @db.String(64)
+  quotaKey      String                    @map("quota_key") @db.String(128)
+  periodKey     String                    @map("period_key") @db.String(64)
+  threshold     Int                       @db.Int2
+  status        InfrastructureAlertStatus @default(PENDING)
+  attemptCount  Int                       @default(0) @map("attempt_count")
+  safeLastError String?                   @map("safe_last_error") @db.String(1000)
+  lastAttemptAt DateTime?                 @map("last_attempt_at") @db.Timestamptz(6)
+  sentAt        DateTime?                 @map("sent_at") @db.Timestamptz(6)
+  sentById      String?                   @map("sent_by_id") @db.Uuid
+  createdAt     DateTime                  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime                  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  sentBy User? @relation("InfrastructureAlertSentBy", fields: [sentById], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@unique([provider, quotaKey, periodKey, threshold], map: "infrastructure_alert_delivery_latch_key")
+  @@index([status, lastAttemptAt], map: "infrastructure_alert_delivery_retry_idx")
+  @@map("infrastructure_alert_deliveries")
+}
+
+model InfrastructureControlState {
+  singletonKey      String                        @id @default("global") @map("singleton_key") @db.String(32)
+  protectionState   InfrastructureProtectionState @default(NORMAL) @map("protection_state")
+  effectivePercent  Decimal                       @default(0) @map("effective_percent") @db.Decimal(8, 4)
+  effectiveProvider String?                       @map("effective_provider") @db.String(64)
+  effectiveQuotaKey String?                       @map("effective_quota_key") @db.String(128)
+  effectiveSource   InfrastructureUsageSource?    @map("effective_source")
+  evaluatedAt       DateTime                      @map("evaluated_at") @db.Timestamptz(6)
+  lastReconciledAt  DateTime?                     @map("last_reconciled_at") @db.Timestamptz(6)
+  updatedAt         DateTime                      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("infrastructure_control_state")
+}
+
+model AuditEvent {
+  id           String      @id @default(uuid()) @db.Uuid
+  actorUserId  String?     @map("actor_user_id") @db.Uuid
+  surveyId     String?     @map("survey_id") @db.Uuid
+  action       String      @db.String(160)
+  targetType   String?     @map("target_type") @db.String(100)
+  targetId     String?     @map("target_id") @db.String(128)
+  result       AuditResult
+  affectedRows Int?        @map("affected_rows")
+  safeMetadata Json?       @map("safe_metadata") @db.JsonB
+  createdAt    DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor  User?   @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+  survey Survey? @relation(fields: [surveyId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+
+  @@index([actorUserId, createdAt(sort: Desc)], map: "audit_events_actor_created_idx")
+  @@index([surveyId, createdAt(sort: Desc)], map: "audit_events_survey_created_idx")
+  @@index([action, createdAt(sort: Desc)], map: "audit_events_action_created_idx")
+  @@map("audit_events")
+}
+
+model SecurityRateLimit {
+  id          String   @id @default(uuid()) @db.Uuid
+  scope       String   @db.String(100)
+  subjectHash Bytes    @map("subject_hash") @db.Bytes
+  windowStart DateTime @map("window_start") @db.Timestamptz(6)
+  expiresAt   DateTime @map("expires_at") @db.Timestamptz(6)
+  hitCount    Int      @default(0) @map("hit_count")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([scope, subjectHash, windowStart], map: "security_rate_limits_bucket_key")
+  @@index([expiresAt], map: "security_rate_limits_expires_at_idx")
+  @@map("security_rate_limits")
 }

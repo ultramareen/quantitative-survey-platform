@@ -13,6 +13,8 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    include: ["tests/**/*.test.{ts,tsx}"],
+    exclude: ["tests/database/**/*.integration.test.ts"],
     setupFiles: ["./tests/setup.ts"],
     coverage: {
       reporter: ["text", "json", "html"],

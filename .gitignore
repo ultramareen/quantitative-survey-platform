@@ -15,9 +15,8 @@ coverage/
 .env.*
 !.env.example
 
-# Generated Prisma client and migrations are introduced in later phases.
+# Generated Prisma client is not source-controlled.
 generated/
-prisma/migrations/
 
 # Logs and local editor/OS files
 *.log

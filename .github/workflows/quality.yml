@@ -1,4 +1,4 @@
-name: Phase 0 quality gate
+name: Phase 0 and 1 quality gate
 
 on:
   pull_request:
@@ -28,4 +28,11 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Install CockroachDB test binary
+        run: |
+          curl -fsSLO https://binaries.cockroachdb.com/cockroach-v25.4.4.linux-amd64.tgz
+          curl -fsSLO https://binaries.cockroachdb.com/cockroach-v25.4.4.linux-amd64.tgz.sha256sum
+          sha256sum --check cockroach-v25.4.4.linux-amd64.tgz.sha256sum
+          tar -xzf cockroach-v25.4.4.linux-amd64.tgz
+          echo "$PWD/cockroach-v25.4.4.linux-amd64" >> "$GITHUB_PATH"
       - run: pnpm verify
