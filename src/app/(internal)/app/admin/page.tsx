@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { StatusBadge } from "@/components/ui/status-badge";
 import { redirect } from "next/navigation";
 
@@ -21,9 +23,16 @@ export default async function AdminFoundationPage() {
         Administration shell
       </h1>
       <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-        Server-side authorization confirmed the Admin role. Employee and
-        infrastructure controls remain reserved for later approved phases.
+        Server-side authorization confirmed the Admin role. Employee invitation,
+        role, and lifecycle controls are available now. Infrastructure controls
+        remain reserved for a later approved phase.
       </p>
+      <Link
+        className="mt-6 inline-block rounded-lg bg-blue-700 px-4 py-3 font-medium text-white"
+        href="/app/admin/employees"
+      >
+        Manage employees
+      </Link>
     </section>
   );
 }

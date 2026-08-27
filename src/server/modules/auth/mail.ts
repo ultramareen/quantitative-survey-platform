@@ -11,6 +11,16 @@ export type PasswordResetMail = {
   expiresAt: Date;
 };
 
+export type InvitationMail = {
+  recipient: string;
+  invitationUrl: string;
+  expiresAt: Date;
+};
+
+export interface InvitationMailAdapter {
+  sendInvitation(message: InvitationMail): Promise<void>;
+}
+
 export interface AuthMailAdapter {
   sendPasswordReset(message: PasswordResetMail): Promise<void>;
 }
@@ -18,18 +28,30 @@ export interface AuthMailAdapter {
 export class LocalFileMailAdapter implements AuthMailAdapter {
   constructor(private readonly mailboxPath: string) {}
 
+  async sendInvitation(message: InvitationMail): Promise<void> {
+    await this.append({
+      type: "employee-invitation",
+      recipient: message.recipient,
+      invitationUrl: message.invitationUrl,
+      expiresAt: message.expiresAt.toISOString(),
+    });
+  }
+
   async sendPasswordReset(message: PasswordResetMail): Promise<void> {
+    await this.append({
+      type: "password-reset",
+      recipient: message.recipient,
+      resetUrl: message.resetUrl,
+      expiresAt: message.expiresAt.toISOString(),
+    });
+  }
+
+  private async append(message: Record<string, string>) {
     await mkdir(dirname(this.mailboxPath), { recursive: true });
-    await appendFile(
-      this.mailboxPath,
-      JSON.stringify({
-        type: "password-reset",
-        recipient: message.recipient,
-        resetUrl: message.resetUrl,
-        expiresAt: message.expiresAt.toISOString(),
-      }) + "\n",
-      { encoding: "utf8", mode: 0o600 },
-    );
+    await appendFile(this.mailboxPath, JSON.stringify(message) + "\n", {
+      encoding: "utf8",
+      mode: 0o600,
+    });
     await chmod(this.mailboxPath, 0o600);
   }
 }
@@ -42,6 +64,16 @@ export class ResendMailAdapter implements AuthMailAdapter {
     private readonly sender: string,
   ) {
     this.#client = new Resend(apiKey);
+  }
+
+  async sendInvitation(message: InvitationMail): Promise<void> {
+    const result = await this.#client.emails.send({
+      from: this.sender,
+      to: message.recipient,
+      subject: "Your Quantitative Survey Platform invitation",
+      text: `Use this one-time link within 72 hours to create your account:\n\n${message.invitationUrl}\n\nIf you were not expecting this, you can ignore this message.`,
+    });
+    if (result.error) throw new Error("Invitation email delivery failed.");
   }
 
   async sendPasswordReset(message: PasswordResetMail): Promise<void> {
@@ -60,7 +92,7 @@ export function createAuthMailAdapter(input: {
   localMailboxPath?: string;
   resendApiKey?: string;
   resendFromEmail?: string;
-}): AuthMailAdapter {
+}): AuthMailAdapter & InvitationMailAdapter {
   if (input.transport === "resend") {
     if (!input.resendApiKey || !input.resendFromEmail) {
       throw new Error("Resend mail transport is not configured.");
