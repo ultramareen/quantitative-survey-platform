@@ -10,6 +10,8 @@
 
 **Change control:** Do not modify architectural or product behavior during implementation without explicit user approval. If PRD and Architecture conflict, implementation must stop and surface the conflict.
 
+**Approved post-v1.0 amendment — 27 August 2026:** Employee onboarding uses a 72-hour, one-time tokenized invitation. This amendment supersedes exact-email-only registration where necessary; exact email and role remain Admin-controlled.
+
 ## A. Executive architecture
 
 The MVP is a TypeScript modular monolith built with Next.js, React and Tailwind CSS. It runs on Netlify Free, stores its relational data in CockroachDB Cloud Basic through Prisma, uses self-hosted Better Auth for employee authentication, Resend Free for employee transactional email, and ExcelJS for on-demand XLSX generation.
@@ -150,23 +152,24 @@ The platform has exactly three roles:
 - `PRODUCT_MANAGER`
 - `RESEARCHER`
 
-Open/domain self-registration is prohibited. `EmployeeInvitation` is the exact-email Admin allowlist:
+Open/domain self-registration is prohibited. `EmployeeInvitation` is the exact-email Admin allowlist and tokenized onboarding authority:
 
-1. Admin enters a normalized exact email and assigns one of the three roles.
-2. The invitation starts as `INVITED`.
-3. The employee registers using that exact email and creates a password.
-4. In one Serializable transaction the server locks the invitation, verifies `INVITED`, counts active non-disabled Users, requires fewer than 15, creates the User with `role = invitation.assigned_role`, links the invitation, and marks it `REGISTERED`.
-5. Cockroach serialization conflicts receive bounded jittered retries.
-6. Admin may remove an unused invitation, change a registered employee’s role, disable or re-enable an employee.
+1. Admin enters a normalized exact email and assigns one of the three roles. The MVP has no employee-domain restriction.
+2. The invitation starts as `INVITED`. The server generates a cryptographically secure token, stores only its unique hash, sets `token_expires_at` to 72 hours later, and emails `/accept-invitation?token=...`.
+3. The invitation page resolves the token server-side, displays the invited email as read-only, and accepts only display name, password, and password confirmation. Browser-supplied email or role is rejected or ignored.
+4. In one Serializable transaction the server locks the invitation, verifies its token hash, `INVITED` status, expiry and non-consumption, counts active non-disabled Users and requires fewer than 15, creates the User and Argon2id credential with `role = invitation.assigned_role`, links the invitation, clears its token fields, marks it `REGISTERED`, and writes a safe audit event.
+5. Cockroach serialization conflicts receive bounded jittered retries; concurrent acceptance of one invitation can create at most one User.
+6. Admin may resend an `INVITED` invitation by atomically replacing its token hash and resetting expiry to 72 hours before sending the new link. The old link becomes invalid immediately. An expired invitation remains `INVITED` but cannot be accepted until resent.
+7. Admin may remove an unused invitation, change a registered employee’s role, disable or re-enable an employee. Disabling clears any usable invitation token fields.
 
-The registration request cannot choose a role; a supplied role field is rejected or ignored. All three roles count toward the maximum of 15 while active. Disabled employees do not count. Re-enable performs the same transactional count.
+All three roles count toward the maximum of 15 while registered and non-disabled. `INVITED` invitations and disabled employees do not count. Re-enable performs the same transactional count. No last-Admin safeguard is included in the MVP; it is a possible future hardening item.
 
 Only Admin may change a role. The role-change transaction updates User and linked EmployeeInvitation, increments `authorization_version`, audits old/new role, and revokes active sessions so prior permissions cannot persist. Additional Admins may be invited through the same workflow; there is no public elevation path.
 
 ### Authentication records and controls
 
 - `User`: UUID PK, normalized unique employee email, name, three-role enum, `authorization_version`, `disabled_at`, timestamps.
-- `EmployeeInvitation`: UUID PK, normalized unique email, required `assigned_role`, `INVITED/REGISTERED/DISABLED`, nullable unique User FK, inviter/disable metadata and coherent timestamps.
+- `EmployeeInvitation`: UUID PK, normalized unique email, required `assigned_role`, `INVITED/REGISTERED/DISABLED`, nullable unique User FK, inviter/disable metadata, nullable unique token hash and token expiry. `INVITED` requires both token fields; `REGISTERED` and `DISABLED` require both cleared.
 - Better Auth account/password records reference User; passwords use Argon2id with at least 19 MiB memory, 2 iterations, parallelism 1, unique 16-byte salt and 32-byte output, subject to Netlify benchmarking.
 - AuthSession stores only a hash of a 256-bit token, with 8-hour idle and 7-day absolute expiry.
 - PasswordResetToken stores only a hash of a 256-bit token, expires after 30 minutes, and is single-use.
@@ -578,8 +581,9 @@ The implementation must never violate these rules. Database constraints and tran
 
 | Invariant                                                           | Required enforcement                                                                                    |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| Maximum 15 active registered employees                              | Serializable invitation registration/re-enable transaction; count non-disabled Users; concurrency tests |
-| Role originates only from Admin invitation                          | Locked exact-email invitation; server copies `assigned_role`; client cannot select role                 |
+| Maximum 15 active registered employees                              | Serializable invitation registration/re-enable transaction; count non-disabled Users; `INVITED` rows do not count; concurrency tests |
+| Invitation is 72-hour, hash-only and single-use                      | Unique token hash, expiry and lifecycle constraints; locked transactional consumption; resend rotates hash |
+| Role originates only from Admin invitation                          | Locked token-resolved exact-email invitation; server copies `assigned_role`; client cannot select role  |
 | Product Manager receives no respondent PII                          | Central PII policy returns `403` before respondent query/decryption; separate DTOs and direct API tests |
 | Researcher/Admin only for respondent plaintext/XLSX                 | Server role policy on every view/search/export; audit PII exports                                       |
 | Instrument immutable after activation                               | Survey mutation service requires DRAFT; state/version and direct API tests                              |

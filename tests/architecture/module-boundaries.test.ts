@@ -118,7 +118,7 @@ describe("module boundaries", () => {
     expect(violations).toEqual([]);
   });
 
-  it("configures the approved Phase 1 CockroachDB models and migrations", async () => {
+  it("configures the approved CockroachDB models and migration baseline", async () => {
     const schema = await readFile(
       join(root, "prisma", "schema.prisma"),
       "utf8",
@@ -132,6 +132,6 @@ describe("module boundaries", () => {
     const migrations = (await readdir(join(root, "prisma", "migrations")))
       .filter((name) => /^\d{12}_/.test(name))
       .sort();
-    expect(migrations).toHaveLength(9);
+    expect(migrations).toHaveLength(10);
   });
 });

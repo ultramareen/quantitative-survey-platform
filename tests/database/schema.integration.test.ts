@@ -165,18 +165,98 @@ describe("Phase 1 CockroachDB schema", () => {
       "COMPLETED",
     ]);
     expect(enums.get("ResponseAttemptStatus")).toEqual(["CURRENT", "ARCHIVED"]);
+    expect(enums.get("InvitationStatus")).toEqual([
+      "INVITED",
+      "REGISTERED",
+      "DISABLED",
+    ]);
   });
 
-  it("enforces the EmployeeInvitation lifecycle", async () => {
+  it("enforces the tokenized EmployeeInvitation lifecycle", async () => {
+    const expiresAt = new Date(syntheticNow.getTime() + 72 * 60 * 60 * 1000);
+
+    await client.query(
+      `INSERT INTO employee_invitations (
+         id, email_normalized, assigned_role, status, token_hash,
+         token_expires_at, invited_by_id, updated_at
+       ) VALUES (gen_random_uuid(), 'invited-a@synthetic.invalid',
+         'RESEARCHER', 'INVITED', $1, $2, $3, $4),
+         (gen_random_uuid(), 'invited-b@synthetic.invalid',
+         'PRODUCT_MANAGER', 'INVITED', $5, $2, $3, $4)`,
+      [
+        syntheticBytes.tokenHashA,
+        expiresAt,
+        syntheticIds.admin,
+        syntheticNow,
+        syntheticBytes.tokenHashB,
+      ],
+    );
+
     await rejectsConstraint(() =>
       client.query(
         `INSERT INTO employee_invitations (
-           id, email_normalized, assigned_role, status, invited_by_id,
-           registered_at, updated_at
-         ) VALUES (gen_random_uuid(), 'invalid-invitation@synthetic.invalid',
-           'RESEARCHER', 'PENDING', $1, $2, $2)`,
+           id, email_normalized, assigned_role, status, invited_by_id, updated_at
+         ) VALUES (gen_random_uuid(), 'missing-token@synthetic.invalid',
+           'RESEARCHER', 'INVITED', $1, $2)`,
         [syntheticIds.admin, syntheticNow],
       ),
+    );
+    await rejectsConstraint(() =>
+      client.query(
+        `INSERT INTO employee_invitations (
+           id, email_normalized, assigned_role, status, token_hash,
+           token_expires_at, registered_user_id, registered_at, invited_by_id, updated_at
+         ) VALUES (gen_random_uuid(), 'registered-token@synthetic.invalid',
+           'RESEARCHER', 'REGISTERED', $1, $2, $3, $4, $3, $4)`,
+        [
+          Buffer.alloc(32, 31),
+          expiresAt,
+          syntheticIds.researcher,
+          syntheticNow,
+        ],
+      ),
+    );
+    await rejectsConstraint(() =>
+      client.query(
+        `INSERT INTO employee_invitations (
+           id, email_normalized, assigned_role, status, token_hash,
+           token_expires_at, invited_by_id, disabled_by_id, disabled_at, updated_at
+         ) VALUES (gen_random_uuid(), 'disabled-token@synthetic.invalid',
+           'RESEARCHER', 'DISABLED', $1, $2, $3, $3, $4, $4)`,
+        [Buffer.alloc(32, 32), expiresAt, syntheticIds.admin, syntheticNow],
+      ),
+    );
+    await rejectsConstraint(() =>
+      client.query(
+        `INSERT INTO employee_invitations (
+           id, email_normalized, assigned_role, status, token_hash,
+           token_expires_at, invited_by_id, updated_at
+         ) VALUES (gen_random_uuid(), 'duplicate-token@synthetic.invalid',
+           'ADMIN', 'INVITED', $1, $2, $3, $4)`,
+        [
+          syntheticBytes.tokenHashA,
+          expiresAt,
+          syntheticIds.admin,
+          syntheticNow,
+        ],
+      ),
+    );
+
+    await client.query(
+      `INSERT INTO employee_invitations (
+         id, email_normalized, assigned_role, status, registered_user_id,
+         registered_at, invited_by_id, updated_at
+       ) VALUES (gen_random_uuid(), 'registered-null@synthetic.invalid',
+         'RESEARCHER', 'REGISTERED', $1, $2, $3, $2)`,
+      [syntheticIds.researcher, syntheticNow, syntheticIds.admin],
+    );
+    await client.query(
+      `INSERT INTO employee_invitations (
+         id, email_normalized, assigned_role, status, invited_by_id,
+         disabled_by_id, disabled_at, updated_at
+       ) VALUES (gen_random_uuid(), 'disabled-null@synthetic.invalid',
+         'ADMIN', 'DISABLED', $1, $1, $2, $2)`,
+      [syntheticIds.admin, syntheticNow],
     );
   });
 

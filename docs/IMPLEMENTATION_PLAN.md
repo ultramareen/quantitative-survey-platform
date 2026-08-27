@@ -2,7 +2,7 @@
 
 **Status:** APPROVED  
 **Architecture:** Frozen  
-**PRD:** v1.0
+**PRD:** v1.0 with approved tokenized-invitation amendment dated 27 August 2026
 
 ## A. PRD/architecture conflict check
 
@@ -14,7 +14,7 @@ The previously identified conflict is resolved by the approved rule:
 - Every calculation creates a new immutable ResultsSnapshot.
 - Existing snapshots are never overwritten.
 
-This supersedes the narrower wording in PRD v1.0 Section 11. No other blocking contradictions were found. Earlier prompts are not requirements.
+This supersedes the narrower wording in PRD v1.0 Section 11. The approved post-v1.0 amendment dated 27 August 2026 also supersedes exact-email-only employee registration with a 72-hour, one-time tokenized invitation while retaining Admin-controlled exact email and role. No other blocking contradictions were found. Earlier prompts are not requirements.
 
 ## B. Critical system invariants
 
@@ -22,8 +22,9 @@ UI controls may communicate these rules, but never serve as their sole enforceme
 
 | Invariant                                             | Primary enforcement                                                         | Supporting enforcement and tests                                            |
 | ----------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| At most 15 active registered employees                | Serializable registration/re-enable transaction counting non-disabled Users | Invitation lock, bounded serialization retry, concurrent-registration tests |
-| Role originates only from Admin invitation            | Invitation row lock; server copies `assigned_role`                          | Reject client role fields; audit and authorization tests                    |
+| At most 15 active registered employees                | Serializable registration/re-enable transaction counting non-disabled Users | `INVITED` rows excluded; invitation lock, bounded retry, concurrency tests  |
+| Invitation is 72-hour, hash-only and single-use        | Unique token hash, expiry and lifecycle constraints; locked consumption      | Expired/reused/disabled denial and resend-invalidates-old-link tests         |
+| Role originates only from Admin invitation            | Token-resolved invitation lock; server copies email and `assigned_role`      | Reject client email/role fields; audit and authorization tests              |
 | Only Admin changes roles                              | Server authorization policy                                                 | Atomic User/invitation update, session revocation, negative API tests       |
 | Product Manager never receives respondent PII         | PII service policy returns `403` before query/decryption                    | Separate aggregate/PII DTOs, response-schema tests, E2E negative tests      |
 | Researcher/Admin only for respondent PII              | Central `requirePiiRole` policy                                             | Route tests for list, detail, search, drill-down, and exports               |
@@ -291,39 +292,45 @@ Phase 12 can begin its estimation model after Phase 5, but automatic protection 
 
 **Complexity:** M
 
-**Objective:** Deliver exact-email invitation, registration, role assignment/change, disable/re-enable, and the 15-active-user invariant.
+**Objective:** Deliver tokenized exact-email invitation, registration, role assignment/change, disable/re-enable, and the 15-active-user invariant.
 
-**Dependencies:** Phase 3.
+**Dependencies:** Phase 3 and the approved tokenized-invitation amendment dated 27 August 2026.
 
-**Database changes:** Activate EmployeeInvitation relations, status checks, assigned role, audit entries, and supporting indexes.
+**Database changes:** Add nullable unique invitation token hash and token expiry, rename `PENDING` to `INVITED`, replace lifecycle checks, and retain assigned-role, restrictive-FK, audit and supporting-index invariants through one forward migration.
 
 **Backend work:**
 
-- Admin add/remove-unused-invitation operations.
-- Registration transaction: lock invitation, validate exact normalized email/status, count active Users `<15`, copy assigned role, link User, mark REGISTERED.
+- Admin create/remove-unused-invitation operations using normalized exact email and Admin-assigned role; no domain restriction.
+- Generate a 256-bit invitation token, store only its hash, expire it after 72 hours, and send `/accept-invitation?token=...` through the mail adapter.
+- Resend transaction: lock an `INVITED` invitation, rotate the token hash, reset expiry to 72 hours, invalidate the old link immediately, and audit without token material.
+- Acceptance transaction: resolve and lock by token hash, validate `INVITED` and unexpired, count active Users `<15`, create User and Argon2id credential from server-resolved email and assigned role, link User, clear token fields, mark `REGISTERED`, and audit.
 - Admin role-change transaction updating User/invitation, incrementing authorization version, auditing, and revoking sessions.
-- Disable/re-enable with the same active-count protection.
+- Disable/re-enable with the same active-count protection; disabling clears usable invitation token fields. `INVITED` rows do not count toward 15. No last-Admin safeguard is included in the MVP.
 
 **Frontend work:**
 
 - Admin employee list.
-- Invitation form with exact email and role selector.
+- Invitation form with exact email and role selector; resend for `INVITED` invitations.
 - Role change, disable/re-enable, and unused-invitation removal.
-- Employee registration form without role input.
+- `/accept-invitation?token=...` form showing read-only email and accepting display name, password, and confirmation without email or role inputs.
+- Safe malformed, expired, consumed and disabled invitation states.
 
 **Security requirements:**
 
 - Admin-only management routes.
-- Registration ignores/rejects any role field.
+- Raw invitation tokens exist only transiently and in the emailed URL; database, audit records and logs contain no raw token.
+- Acceptance ignores/rejects browser-supplied email or role and resolves both from the locked invitation.
+- Token is single-use; resend rotates it; expiry is enforced from server time; acceptance and account creation are transactional.
 - Email normalization is deterministic.
 - Generic responses must not expose allowlist membership unnecessarily.
 
 **Tests:**
 
-- Unit tests for normalization/status transitions.
-- Direct non-Admin API denial.
-- Concurrent registrations/re-enables at 14 active users.
-- Duplicate email and reused invitation tests.
+- Unit tests for normalization/status transitions and 72-hour expiry.
+- Direct Product Manager and Researcher API denial.
+- Hash-only persistence, malformed/expired/consumed/disabled rejection, and resend invalidation.
+- Concurrent registrations/re-enables at 14 active users and concurrent acceptance of one invitation.
+- Duplicate email and reused invitation tests; role and email originate only from invitation.
 - Role change revokes old sessions and writes audit event.
 
 **Acceptance criteria:**
@@ -332,7 +339,7 @@ Phase 12 can begin its estimation model after Phase 5, but automatic protection 
 - User role always equals the Admin-assigned invitation role at registration.
 - Disabled users lose access immediately and stop counting toward 15.
 
-**Demo scenario:** Invite a Product Manager, register through the exact email, verify the assigned role, change it to Researcher, and show the prior session is invalidated.
+**Demo scenario:** Invite a Product Manager, accept the 72-hour one-time link with read-only email, create a password, verify the assigned role, change it to Researcher, and show the prior session is invalidated.
 
 **Approval gate 2:** Employee authentication, invitation, role management, and negative authorization behavior.
 
@@ -905,9 +912,10 @@ No migrations are created during planning. Intended order:
 
 2. **EmployeeInvitation**
    - Unique normalized email.
-   - `assigned_role`, status, nullable unique User FK, inviter/disable metadata.
-   - Status/user/timestamp checks.
-   - Restrictive deletion rules.
+   - `assigned_role`, `INVITED/REGISTERED/DISABLED` status, nullable unique User FK, inviter/disable metadata.
+   - Nullable unique token hash and token expiry; `INVITED` requires both and `REGISTERED`/`DISABLED` require both cleared.
+   - Status/user/timestamp/token lifecycle checks and restrictive deletion rules.
+   - A later approved forward migration renames legacy `PENDING` to `INVITED`, adds token persistence, safely expires any legacy pending rows, and replaces lifecycle checks without rewriting the original migration.
 
 3. **Survey and audit foundation**
    - Survey UUID PK, random public ID, owner FK, status, pause reason, state version.
