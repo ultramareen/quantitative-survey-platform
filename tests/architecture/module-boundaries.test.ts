@@ -68,6 +68,13 @@ describe("module boundaries", () => {
       "src/server/http/cookies.ts",
       "src/server/http/request-validation.ts",
       "src/server/logging/logger.ts",
+      "src/server/modules/cryptography/index.ts",
+      "src/server/modules/cryptography/aes-gcm.ts",
+      "src/server/modules/cryptography/hmac.ts",
+      "src/server/modules/cryptography/key-registry.ts",
+      "src/server/modules/cryptography/password.ts",
+      "src/server/modules/cryptography/reference-id.ts",
+      "src/server/modules/cryptography/tokens.ts",
     ];
 
     for (const path of sensitiveEntryPoints) {
@@ -75,6 +82,24 @@ describe("module boundaries", () => {
         'import "server-only"',
       );
     }
+  });
+
+  it("keeps cryptography imports out of every browser-reachable module", async () => {
+    const files = await sourceFiles(sourceRoot);
+    const violations: string[] = [];
+    for (const file of files) {
+      const content = await readFile(file, "utf8");
+      const isBrowserReachable =
+        content.trimStart().startsWith('"use client"') ||
+        file.includes(`${join("src", "components")}`);
+      if (
+        isBrowserReachable &&
+        /server\/modules\/cryptography|from ["']argon2["']/.test(content)
+      ) {
+        violations.push(relative(root, file));
+      }
+    }
+    expect(violations).toEqual([]);
   });
 
   it("does not expose secret-shaped names through NEXT_PUBLIC variables", async () => {

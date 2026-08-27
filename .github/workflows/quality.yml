@@ -1,4 +1,4 @@
-name: Phase 0 and 1 quality gate
+name: Phase 0 through 2 quality gate
 
 on:
   pull_request:
@@ -17,6 +17,11 @@ jobs:
       APP_ORIGIN: http://localhost:3000
       DATABASE_URL: postgresql://synthetic:synthetic@localhost:26257/test
       BETTER_AUTH_SECRET: synthetic-ci-secret-that-is-at-least-32-characters
+      PII_ENCRYPTION_ACTIVE_VERSION: 1
+      PII_ENCRYPTION_KEY_V1: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
+      PHONE_LOOKUP_HMAC_ACTIVE_VERSION: 1
+      PHONE_LOOKUP_HMAC_KEY_V1: AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=
+      RATE_LIMIT_HMAC_KEY: AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=
       LOG_LEVEL: info
     steps:
       - uses: actions/checkout@v4

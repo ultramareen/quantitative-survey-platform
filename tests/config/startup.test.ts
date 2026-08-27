@@ -11,19 +11,24 @@ describe("startup configuration gate", () => {
     let output = "";
 
     try {
-      execFileSync(process.execPath, ["--import", "tsx", script], {
-        cwd: root,
-        encoding: "utf8",
-        env: {
-          PATH: process.env.PATH,
-          NODE_ENV: "test",
-          APP_ENV: "test",
-          APP_ORIGIN: "http://localhost:3000",
-          DATABASE_URL: "postgresql://synthetic:synthetic@localhost:26257/test",
-          BETTER_AUTH_SECRET: "short",
+      execFileSync(
+        process.execPath,
+        ["--conditions=react-server", "--import", "tsx", script],
+        {
+          cwd: root,
+          encoding: "utf8",
+          env: {
+            PATH: process.env.PATH,
+            NODE_ENV: "test",
+            APP_ENV: "test",
+            APP_ORIGIN: "http://localhost:3000",
+            DATABASE_URL:
+              "postgresql://synthetic:synthetic@localhost:26257/test",
+            BETTER_AUTH_SECRET: "short",
+          },
+          stdio: "pipe",
         },
-        stdio: "pipe",
-      });
+      );
     } catch (error) {
       const failure = error as {
         stdout?: string;

@@ -1,6 +1,10 @@
 import { z } from "zod";
 
 import { AppError } from "@/server/errors/app-error";
+import {
+  parseCryptographyConfiguration,
+  type CryptographyConfiguration,
+} from "@/server/modules/cryptography/key-registry";
 
 const serverEnvironmentSchema = z.object({
   APP_ENV: z.enum(["development", "test", "preview", "production"]),
@@ -27,7 +31,9 @@ const serverEnvironmentSchema = z.object({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
-export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema>;
+export type ServerEnvironment = z.infer<typeof serverEnvironmentSchema> & {
+  cryptography: CryptographyConfiguration;
+};
 
 export function parseServerEnvironment(
   input: NodeJS.ProcessEnv,
@@ -52,5 +58,8 @@ export function parseServerEnvironment(
     });
   }
 
-  return result.data;
+  return {
+    ...result.data,
+    cryptography: parseCryptographyConfiguration(input),
+  };
 }

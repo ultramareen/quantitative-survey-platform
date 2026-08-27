@@ -5,7 +5,16 @@ const staticDirectory = join(process.cwd(), ".next", "static");
 const forbiddenValues = [
   process.env.BETTER_AUTH_SECRET,
   process.env.DATABASE_URL,
+  process.env.RATE_LIMIT_HMAC_KEY,
+  ...Object.entries(process.env)
+    .filter(([name]) =>
+      /^(?:PII_ENCRYPTION_KEY|PHONE_LOOKUP_HMAC_KEY)_V\d+$/.test(name),
+    )
+    .map(([, value]) => value),
   "@prisma/client",
+  "QSP_AES_256_GCM",
+  "QSP_PHONE_LOOKUP_HMAC_V1",
+  "QSP_RATE_LIMIT_HMAC_V1",
 ].filter((value): value is string => Boolean(value));
 
 async function filesUnder(directory: string): Promise<string[]> {

@@ -38,6 +38,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   agentRules: false,
   poweredByHeader: false,
+  serverExternalPackages: ["argon2"],
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

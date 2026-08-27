@@ -8,10 +8,10 @@
   },
   "packageManager": "pnpm@11.19.0",
   "scripts": {
-    "dev": "node --import tsx scripts/check-env.ts && next dev",
-    "build": "node --import tsx scripts/check-env.ts && next build --webpack",
-    "start": "node --import tsx scripts/check-env.ts && next start",
-    "config:check": "node --import tsx scripts/check-env.ts",
+    "dev": "node --conditions=react-server --import tsx scripts/check-env.ts && next dev",
+    "build": "node --conditions=react-server --import tsx scripts/check-env.ts && next build --webpack",
+    "start": "node --conditions=react-server --import tsx scripts/check-env.ts && next start",
+    "config:check": "node --conditions=react-server --import tsx scripts/check-env.ts",
     "typecheck": "tsc --noEmit",
     "docs:check": "node scripts/check-frozen-docs.mjs",
     "lint": "node scripts/check-frozen-docs.mjs && eslint . --max-warnings=0 && node scripts/check-frozen-docs.mjs",
@@ -25,10 +25,11 @@
     "test:bundle": "node --import tsx scripts/check-client-bundle.ts",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
-    "verify": "node scripts/check-frozen-docs.mjs && prisma generate && tsc --noEmit && eslint . --max-warnings=0 && prettier --check . && vitest run && prisma validate && node scripts/run-database-tests.mjs && node --import tsx scripts/check-env.ts && next build --webpack && node --import tsx scripts/check-client-bundle.ts && node scripts/check-frozen-docs.mjs"
+    "verify": "node scripts/check-frozen-docs.mjs && prisma generate && tsc --noEmit && eslint . --max-warnings=0 && prettier --check . && vitest run && prisma validate && node scripts/run-database-tests.mjs && node --conditions=react-server --import tsx scripts/check-env.ts && next build --webpack && node --import tsx scripts/check-client-bundle.ts && node scripts/check-frozen-docs.mjs"
   },
   "dependencies": {
     "@prisma/client": "7.10.0",
+    "argon2": "0.45.1",
     "next": "16.3.3",
     "pg": "^8.23.0",
     "react": "19.2.8",
