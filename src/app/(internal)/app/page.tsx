@@ -3,17 +3,16 @@ import { StatusBadge } from "@/components/ui/status-badge";
 export default function InternalFoundationPage() {
   return (
     <section aria-labelledby="internal-heading">
-      <StatusBadge label="Foundation preview" tone="info" />
+      <StatusBadge label="Authenticated workspace" tone="info" />
       <h1
         id="internal-heading"
         className="mt-4 text-3xl font-semibold tracking-tight"
       >
-        Internal application shell
+        Employee workspace
       </h1>
       <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-        The employee workspace boundary is ready. Authentication, roles,
-        surveys, and operational data are intentionally not implemented in this
-        phase.
+        Your server-validated employee session is active. Survey and results
+        workflows remain reserved for their approved later phases.
       </p>
       <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {[

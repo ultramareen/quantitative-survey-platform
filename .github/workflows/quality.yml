@@ -10,12 +10,18 @@ permissions:
 
 jobs:
   verify:
+    name: Verify with CockroachDB ${{ matrix.cockroach-version }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        cockroach-version: [25.4.4, 26.2.2]
     env:
       APP_ENV: test
       APP_ORIGIN: http://localhost:3000
       DATABASE_URL: postgresql://synthetic:synthetic@localhost:26257/test
+      MIGRATION_DATABASE_URL: postgresql://synthetic_migration:synthetic@localhost:26257/test?options=-c%20create_table_with_schema_locked%3Doff
       BETTER_AUTH_SECRET: synthetic-ci-secret-that-is-at-least-32-characters
       PII_ENCRYPTION_ACTIVE_VERSION: 1
       PII_ENCRYPTION_KEY_V1: AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=
@@ -35,9 +41,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Install CockroachDB test binary
         run: |
-          curl -fsSLO https://binaries.cockroachdb.com/cockroach-v25.4.4.linux-amd64.tgz
-          curl -fsSLO https://binaries.cockroachdb.com/cockroach-v25.4.4.linux-amd64.tgz.sha256sum
-          sha256sum --check cockroach-v25.4.4.linux-amd64.tgz.sha256sum
-          tar -xzf cockroach-v25.4.4.linux-amd64.tgz
-          echo "$PWD/cockroach-v25.4.4.linux-amd64" >> "$GITHUB_PATH"
+          curl -fsSLO https://binaries.cockroachdb.com/cockroach-v${{ matrix.cockroach-version }}.linux-amd64.tgz
+          curl -fsSLO https://binaries.cockroachdb.com/cockroach-v${{ matrix.cockroach-version }}.linux-amd64.tgz.sha256sum
+          sha256sum --check cockroach-v${{ matrix.cockroach-version }}.linux-amd64.tgz.sha256sum
+          tar -xzf cockroach-v${{ matrix.cockroach-version }}.linux-amd64.tgz
+          echo "$PWD/cockroach-v${{ matrix.cockroach-version }}.linux-amd64" >> "$GITHUB_PATH"
       - run: pnpm verify

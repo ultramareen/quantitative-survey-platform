@@ -25,3 +25,12 @@ minimumReleaseAgeExclude:
   - eslint-config-next@16.3.3
   - next@16.3.3
   - prisma@7.10.0
+  - "@better-auth/core@1.7.2"
+  - "@better-auth/drizzle-adapter@1.7.2"
+  - "@better-auth/kysely-adapter@1.7.2"
+  - "@better-auth/memory-adapter@1.7.2"
+  - "@better-auth/mongo-adapter@1.7.2"
+  - "@better-auth/prisma-adapter@1.7.2"
+  - "@better-auth/telemetry@1.7.2"
+  - better-auth@1.7.2
+  - resend@6.24.0

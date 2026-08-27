@@ -1,12 +1,24 @@
 // @vitest-environment jsdom
 
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { InternalShell } from "@/components/layout/internal-shell";
 import { PublicShell } from "@/components/layout/public-shell";
 import { FormField } from "@/components/ui/form-field";
 import { LoadingState } from "@/components/ui/loading-state";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: vi.fn(), refresh: vi.fn() }),
+}));
+
+const employee = {
+  id: "employee-1",
+  email: "admin@synthetic.invalid",
+  displayName: "Synthetic Admin",
+  role: "ADMIN" as const,
+  authorizationVersion: 1,
+};
 
 describe("responsive and accessible foundation primitives", () => {
   it("renders a public landmark and accessible home link", () => {
@@ -24,7 +36,7 @@ describe("responsive and accessible foundation primitives", () => {
 
   it("renders semantic internal navigation with responsive layout classes", () => {
     const { container } = render(
-      <InternalShell>
+      <InternalShell employee={employee}>
         <h1>Internal content</h1>
       </InternalShell>,
     );

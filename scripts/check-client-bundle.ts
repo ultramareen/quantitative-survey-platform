@@ -6,6 +6,8 @@ const forbiddenValues = [
   process.env.BETTER_AUTH_SECRET,
   process.env.DATABASE_URL,
   process.env.RATE_LIMIT_HMAC_KEY,
+  process.env.RESEND_API_KEY,
+  process.env.QSP_BOOTSTRAP_PASSWORD,
   ...Object.entries(process.env)
     .filter(([name]) =>
       /^(?:PII_ENCRYPTION_KEY|PHONE_LOOKUP_HMAC_KEY)_V\d+$/.test(name),
@@ -15,6 +17,9 @@ const forbiddenValues = [
   "QSP_AES_256_GCM",
   "QSP_PHONE_LOOKUP_HMAC_V1",
   "QSP_RATE_LIMIT_HMAC_V1",
+  "QSP_BOOTSTRAP_PASSWORD",
+  "QSP_BOOTSTRAP_EMAIL",
+  "QSP_BOOTSTRAP_DISPLAY_NAME",
 ].filter((value): value is string => Boolean(value));
 
 async function filesUnder(directory: string): Promise<string[]> {

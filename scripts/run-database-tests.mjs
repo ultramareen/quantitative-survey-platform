@@ -84,6 +84,26 @@ async function schemaFingerprint(url) {
   }
 }
 
+function migrationUrl(runtimeUrl) {
+  const parsedRuntimeUrl = new URL(runtimeUrl);
+  const runtimeOptions = parsedRuntimeUrl.searchParams.get("options") ?? "";
+  if (runtimeOptions.includes("create_table_with_schema_locked")) {
+    throw new Error(
+      "DATABASE_URL must not contain the migration-only schema-lock option",
+    );
+  }
+
+  const separator = runtimeUrl.includes("?") ? "&" : "?";
+  const url = `${runtimeUrl}${separator}options=-c%20create_table_with_schema_locked%3Doff`;
+  if (
+    new URL(url).searchParams.get("options") !==
+    "-c create_table_with_schema_locked=off"
+  ) {
+    throw new Error("Migration URL is missing the required schema-lock option");
+  }
+  return url;
+}
+
 const cockroachBinary = process.env.COCKROACH_BINARY ?? "cockroach";
 const storeDirectory = await mkdtemp(join(tmpdir(), "qsp-phase1-cockroach-"));
 const sqlPort = await freePort();
@@ -92,6 +112,8 @@ const baseUrl = `postgresql://root@127.0.0.1:${sqlPort}`;
 const defaultUrl = `${baseUrl}/defaultdb?sslmode=disable`;
 const databaseUrlA = `${baseUrl}/qsp_phase1_a?sslmode=disable`;
 const databaseUrlB = `${baseUrl}/qsp_phase1_b?sslmode=disable`;
+const migrationDatabaseUrlA = migrationUrl(databaseUrlA);
+const migrationDatabaseUrlB = migrationUrl(databaseUrlB);
 
 const serverProcess = spawn(
   cockroachBinary,
@@ -132,11 +154,28 @@ try {
   await admin.end();
 
   await run("pnpm", ["exec", "prisma", "migrate", "deploy"], {
-    env: { DATABASE_URL: databaseUrlA },
+    env: {
+      DATABASE_URL: databaseUrlA,
+      MIGRATION_DATABASE_URL: migrationDatabaseUrlA,
+    },
   });
+  await run(
+    "pnpm",
+    ["exec", "vitest", "run", "--config", "vitest.database.config.ts"],
+    { env: { DATABASE_URL: databaseUrlA } },
+  );
+
   await run("pnpm", ["exec", "prisma", "migrate", "deploy"], {
-    env: { DATABASE_URL: databaseUrlB },
+    env: {
+      DATABASE_URL: databaseUrlB,
+      MIGRATION_DATABASE_URL: migrationDatabaseUrlB,
+    },
   });
+  await run(
+    "pnpm",
+    ["exec", "vitest", "run", "--config", "vitest.database.config.ts"],
+    { env: { DATABASE_URL: databaseUrlB } },
+  );
 
   const [fingerprintA, fingerprintB] = await Promise.all([
     schemaFingerprint(databaseUrlA),
@@ -146,12 +185,9 @@ try {
     throw new Error("Repeated fresh migrations produced different schemas");
   }
 
-  await run(
-    "pnpm",
-    ["exec", "vitest", "run", "--config", "vitest.database.config.ts"],
-    { env: { DATABASE_URL: databaseUrlA } },
+  console.log(
+    "Fresh migration schemas are deterministic and both invariant suites passed.",
   );
-  console.log("Fresh migration schemas are deterministic.");
 } catch (error) {
   if (cockroachStderr) console.error(cockroachStderr);
   throw error;

@@ -48,6 +48,26 @@ describe("server environment", () => {
     ).toThrow("APP_ORIGIN");
   });
 
+  it("requires the real mail adapter in preview and production", () => {
+    expect(() =>
+      parseServerEnvironment({
+        ...validEnvironment,
+        APP_ENV: "production",
+        APP_ORIGIN: "https://survey.example.com",
+      }),
+    ).toThrow("MAIL_TRANSPORT");
+    expect(
+      parseServerEnvironment({
+        ...validEnvironment,
+        APP_ENV: "production",
+        APP_ORIGIN: "https://survey.example.com",
+        MAIL_TRANSPORT: "resend",
+        RESEND_API_KEY: "synthetic-resend-placeholder",
+        RESEND_FROM_EMAIL: "no-reply@synthetic.invalid",
+      }).MAIL_TRANSPORT,
+    ).toBe("resend");
+  });
+
   it("fails closed when the active encryption key is missing", () => {
     const missingActiveKey = { ...validEnvironment };
     delete missingActiveKey.PII_ENCRYPTION_KEY_V1;
@@ -96,5 +116,19 @@ describe("server environment", () => {
     expect(example).not.toMatch(
       /^NEXT_PUBLIC_.*(?:SECRET|TOKEN|PASSWORD|KEY|DATABASE)/m,
     );
+  });
+
+  it("isolates the Cockroach schema-lock option to the migration URL", async () => {
+    const example = await readFile(join(process.cwd(), ".env.example"), "utf8");
+    const runtimeUrl = example.match(/^DATABASE_URL=(.+)$/m)?.[1];
+    const migrationUrl = example.match(/^MIGRATION_DATABASE_URL=(.+)$/m)?.[1];
+
+    expect(runtimeUrl).toBeDefined();
+    expect(migrationUrl).toBeDefined();
+    expect(runtimeUrl).not.toContain("create_table_with_schema_locked");
+    expect(new URL(migrationUrl!).searchParams.get("options")).toBe(
+      "-c create_table_with_schema_locked=off",
+    );
+    expect(migrationUrl).toContain("synthetic_migration_user");
   });
 });

@@ -11,12 +11,15 @@ export function assertTrustedMutationOrigin(
   if (SAFE_METHODS.has(request.method.toUpperCase())) return;
 
   const requestOrigin = request.headers.get("origin");
+  const requestHost = request.headers.get("host");
   const fetchSite = request.headers.get("sec-fetch-site");
-  const isSameOrigin = requestOrigin === new URL(applicationOrigin).origin;
+  const configuredUrl = new URL(applicationOrigin);
+  const isSameOrigin = requestOrigin === configuredUrl.origin;
+  const hasTrustedHost = requestHost === configuredUrl.host;
   const hasTrustedFetchMetadata =
     fetchSite === null || fetchSite === "same-origin";
 
-  if (!isSameOrigin || !hasTrustedFetchMetadata) {
+  if (!isSameOrigin || !hasTrustedHost || !hasTrustedFetchMetadata) {
     throw new AppError({
       category: "AUTHORIZATION",
       code: "UNTRUSTED_ORIGIN",

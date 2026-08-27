@@ -7,6 +7,7 @@ describe("mutation origin guard", () => {
     const request = new Request("https://survey.example.com/api/example", {
       method: "POST",
       headers: {
+        host: "survey.example.com",
         origin: "https://survey.example.com",
         "sec-fetch-site": "same-origin",
       },
@@ -21,8 +22,24 @@ describe("mutation origin guard", () => {
     const request = new Request("https://survey.example.com/api/example", {
       method: "POST",
       headers: {
+        host: "survey.example.com",
         origin: "https://attacker.example",
         "sec-fetch-site": "cross-site",
+      },
+    });
+
+    expect(() =>
+      assertTrustedMutationOrigin(request, "https://survey.example.com"),
+    ).toThrow("origin verification");
+  });
+
+  it("rejects host-header confusion even with a trusted Origin", () => {
+    const request = new Request("https://survey.example.com/api/example", {
+      method: "POST",
+      headers: {
+        host: "attacker.example",
+        origin: "https://survey.example.com",
+        "sec-fetch-site": "same-origin",
       },
     });
 

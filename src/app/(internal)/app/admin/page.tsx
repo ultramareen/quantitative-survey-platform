@@ -1,9 +1,19 @@
 import { StatusBadge } from "@/components/ui/status-badge";
+import { redirect } from "next/navigation";
 
-export default function AdminFoundationPage() {
+import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
+import { requireRole } from "@/server/modules/auth/policies";
+
+export default async function AdminFoundationPage() {
+  const employee = await getCurrentEmployee();
+  try {
+    requireRole(employee, ["ADMIN"]);
+  } catch {
+    redirect("/app?error=forbidden");
+  }
   return (
     <section aria-labelledby="admin-heading">
-      <StatusBadge label="Route boundary only" tone="warning" />
+      <StatusBadge label="Admin authorized" tone="warning" />
       <h1
         id="admin-heading"
         className="mt-4 text-3xl font-semibold tracking-tight"
@@ -11,8 +21,8 @@ export default function AdminFoundationPage() {
         Administration shell
       </h1>
       <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-        This route establishes the future Admin boundary only. It does not
-        provide employee, authorization, or infrastructure controls.
+        Server-side authorization confirmed the Admin role. Employee and
+        infrastructure controls remain reserved for later approved phases.
       </p>
     </section>
   );
