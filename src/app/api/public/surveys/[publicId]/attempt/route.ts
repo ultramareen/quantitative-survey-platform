@@ -20,6 +20,12 @@ const mutationSchema = z
     mutationId: z.string().uuid(),
   })
   .strict();
+const submitSchema = z
+  .object({
+    generation: z.number().int().positive(),
+    baseRevision: z.number().int().nonnegative(),
+  })
+  .strict();
 
 export async function GET(
   request: NextRequest,
@@ -58,6 +64,32 @@ export async function PATCH(
       body,
     );
     return NextResponse.json(state, {
+      headers: { "cache-control": "private, no-store" },
+    });
+  } catch (error) {
+    return publicError(error);
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  context: { params: Promise<{ publicId: string }> },
+) {
+  try {
+    assertTrustedMutationOrigin(request, getServerEnvironment().APP_ORIGIN);
+    if (Number(request.headers.get("content-length") ?? 0) > 4096)
+      return NextResponse.json(
+        { message: "The request is too large." },
+        { status: 413 },
+      );
+    const body = submitSchema.parse(await request.json());
+    const { publicId } = await context.params;
+    const result = await getPublicAttemptService().submit(
+      publicId,
+      request.cookies.get(attemptCookieName(publicId))?.value,
+      body,
+    );
+    return NextResponse.json(result, {
       headers: { "cache-control": "private, no-store" },
     });
   } catch (error) {

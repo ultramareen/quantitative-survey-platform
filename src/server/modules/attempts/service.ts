@@ -14,6 +14,7 @@ import type {
   PublicAnswerValue,
   PublicAttemptState,
   PublicQuestion,
+  PublicSubmitResult,
 } from "@/types/public-survey";
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
@@ -62,17 +63,7 @@ export class PublicAttemptService {
         await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
         const row = await this.resolve(client, publicId, token, true);
         const questions = await this.questions(client, row.survey_id);
-        if (
-          row.status !== "CURRENT" ||
-          (row.survey_status !== "ACTIVE" &&
-            row.survey_status !== "PENDING_CAPACITY")
-        )
-          throw conflict("This response can no longer be edited.");
-        const deadline =
-          (row.last_answer_changed_at ?? row.created_at).getTime() +
-          24 * 60 * 60 * 1000;
-        if (this.clock().getTime() >= deadline)
-          throw conflict("Your response has already been recorded.");
+        this.assertEditable(row);
         if (row.generation !== mutation.generation)
           throw conflict("This response has been replaced.");
         if (row.last_mutation_id === mutation.mutationId) {
@@ -127,6 +118,46 @@ export class PublicAttemptService {
           throw conflict("A newer answer was saved. Please retry.");
         await client.query("COMMIT");
         return this.state(updated.rows[0], questions);
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
+    });
+  }
+
+  async submit(
+    publicId: string,
+    token: string | undefined,
+    input: { generation: number; baseRevision: number },
+  ): Promise<PublicSubmitResult> {
+    return withSerializableRetry(async () => {
+      const client = await this.pool.connect();
+      try {
+        await client.query("BEGIN ISOLATION LEVEL SERIALIZABLE");
+        const row = await this.resolve(client, publicId, token, true);
+        const questions = await this.questions(client, row.survey_id);
+        this.assertEditable(row);
+        if (
+          row.generation !== input.generation ||
+          row.revision !== input.baseRevision
+        )
+          throw conflict("A newer response state is available. Please retry.");
+        const answers = this.payload(row).answers;
+        const missingRequiredPositions = questions
+          .filter(
+            (q) => q.required && answers[String(q.position)] === undefined,
+          )
+          .map((q) => q.position);
+        await client.query("COMMIT");
+        return missingRequiredPositions.length
+          ? { submitted: false, missingRequiredPositions }
+          : {
+              submitted: true,
+              analyticallyComplete:
+                Object.keys(answers).length === questions.length,
+            };
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
@@ -206,6 +237,12 @@ export class PublicAttemptService {
     row: AttemptRow,
     questions: PublicQuestion[],
   ): PublicAttemptState {
+    const editable =
+      row.status === "CURRENT" &&
+      (row.survey_status === "ACTIVE" ||
+        row.survey_status === "PENDING_CAPACITY") &&
+      this.clock().getTime() <
+        (row.last_answer_changed_at ?? row.created_at).getTime() + 86_400_000;
     return {
       title: row.title,
       description: row.description,
@@ -213,7 +250,22 @@ export class PublicAttemptService {
       revision: row.revision,
       answers: this.payload(row).answers,
       questions,
+      editable,
+      recorded: !editable,
     };
+  }
+  private assertEditable(row: AttemptRow) {
+    if (
+      row.status !== "CURRENT" ||
+      (row.survey_status !== "ACTIVE" &&
+        row.survey_status !== "PENDING_CAPACITY")
+    )
+      throw conflict("This response can no longer be edited.");
+    if (
+      this.clock().getTime() >=
+      (row.last_answer_changed_at ?? row.created_at).getTime() + 86_400_000
+    )
+      throw conflict("Your response has already been recorded.");
   }
 }
 

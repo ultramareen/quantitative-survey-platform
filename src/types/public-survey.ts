@@ -35,7 +35,12 @@ export type PublicAttemptState = {
   answers: Record<string, Exclude<PublicAnswerValue, null>>;
   questions: PublicQuestion[];
   conflict?: true;
+  editable: boolean;
+  recorded: boolean;
 };
+export type PublicSubmitResult =
+  | { submitted: true; analyticallyComplete: boolean }
+  | { submitted: false; missingRequiredPositions: number[] };
 export type PublicAnswerMutation = {
   questionPosition: number;
   value: PublicAnswerValue;

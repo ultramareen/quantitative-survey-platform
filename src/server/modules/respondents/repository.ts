@@ -174,7 +174,39 @@ export class PgRespondentRepository implements RespondentRepository {
           `UPDATE public_survey_sessions SET respondent_id=$2,last_seen_at=$3 WHERE id=$1`,
           [session.session_id, respondentId, input.now],
         );
-        if (!created) return { createdAttempt: false };
+        if (!created) {
+          const current = await client.query<{
+            generation: number;
+            attempt_number: number;
+          }>(
+            `UPDATE response_attempts SET status='ARCHIVED',attempt_token_hash=NULL,archived_at=$2,archive_reason='REPLACED'
+              WHERE respondent_id=$1 AND status='CURRENT'
+              RETURNING generation,attempt_number`,
+            [respondentId, input.now],
+          );
+          const prior = current.rows[0];
+          if (!prior) throw unavailable();
+          await client.query(
+            `INSERT INTO response_attempts
+             (id,survey_id,respondent_id,public_survey_session_id,status,generation,attempt_number,attempt_token_hash,payload_ciphertext,payload_nonce,payload_key_version,payload_schema_version,revision,save_count,answered_question_count,coverage_basis_count,created_at,last_activity_at)
+             VALUES ($1,$2,$3,$4,'CURRENT',$5,$6,$7,$8,$9,$10,1,0,0,0,$11,$12,$12)`,
+            [
+              input.attemptId,
+              session.survey_id,
+              respondentId,
+              session.session_id,
+              prior.generation + 1,
+              prior.attempt_number + 1,
+              input.attemptTokenHash,
+              input.payloadCiphertext,
+              input.payloadNonce,
+              input.payloadKeyVersion,
+              session.question_count,
+              input.now,
+            ],
+          );
+          return { createdAttempt: true };
+        }
         await client.query(
           `INSERT INTO response_attempts
            (id,survey_id,respondent_id,public_survey_session_id,status,generation,attempt_number,attempt_token_hash,payload_ciphertext,payload_nonce,payload_key_version,payload_schema_version,revision,save_count,answered_question_count,coverage_basis_count,created_at,last_activity_at)

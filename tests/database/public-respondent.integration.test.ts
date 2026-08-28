@@ -50,6 +50,7 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
   let publicId: string;
   let openToken: string;
   let attemptToken: string;
+  let replacementToken: string;
   beforeAll(async () => {
     const now = new Date();
     await pool.query(
@@ -217,7 +218,70 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
       }),
     ).rejects.toMatchObject({ code: "INVALID_ANSWER" });
   });
-  it("links a new-device Open for the same phone without restoring or replacing the attempt", async () => {
+  it("validates required answers on Submit while keeping analytical completion distinct", async () => {
+    expect(
+      await attempts.submit(publicId, attemptToken, {
+        generation: 1,
+        baseRevision: 3,
+      }),
+    ).toEqual({ submitted: true, analyticallyComplete: true });
+    let state = await attempts.mutate(publicId, attemptToken, {
+      questionPosition: 2,
+      value: null,
+      generation: 1,
+      baseRevision: 3,
+      mutationId: "70000000-0000-4000-8000-000000000006",
+    });
+    expect(
+      await attempts.submit(publicId, attemptToken, {
+        generation: 1,
+        baseRevision: state.revision,
+      }),
+    ).toEqual({ submitted: true, analyticallyComplete: false });
+    state = await attempts.mutate(publicId, attemptToken, {
+      questionPosition: 1,
+      value: null,
+      generation: 1,
+      baseRevision: state.revision,
+      mutationId: "70000000-0000-4000-8000-000000000007",
+    });
+    expect(
+      await attempts.submit(publicId, attemptToken, {
+        generation: 1,
+        baseRevision: state.revision,
+      }),
+    ).toEqual({ submitted: false, missingRequiredPositions: [1] });
+    await attempts.mutate(publicId, attemptToken, {
+      questionPosition: 1,
+      value: 1,
+      generation: 1,
+      baseRevision: state.revision,
+      mutationId: "70000000-0000-4000-8000-000000000008",
+    });
+  });
+  it("enforces the exact 24-hour edit boundary server-side", async () => {
+    const row = (
+      await pool.query(
+        "SELECT last_answer_changed_at FROM response_attempts WHERE attempt_token_hash IS NOT NULL AND survey_id=$1",
+        [surveyId],
+      )
+    ).rows[0];
+    const expired = new PublicAttemptService(
+      pool,
+      crypto,
+      () => new Date(row.last_answer_changed_at.getTime() + 86_400_000),
+    );
+    await expect(
+      expired.mutate(publicId, attemptToken, {
+        questionPosition: 1,
+        value: 2,
+        generation: 1,
+        baseRevision: 6,
+        mutationId: "70000000-0000-4000-8000-000000000009",
+      }),
+    ).rejects.toMatchObject({ code: "ATTEMPT_CONFLICT" });
+  });
+  it("atomically replaces a new-device same-phone attempt and retains archived answers", async () => {
     const second = await respondents.open(publicId, undefined, "phase6-open-b");
     const result = await respondents.identify(
       publicId,
@@ -225,7 +289,14 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
       { name: "Alternate", phone: "+1 202 555 0123", country: "US" },
       "phase6-identify-b",
     );
-    expect(result).toEqual({ identified: true });
+    expect(result.newAttemptToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    replacementToken = result.newAttemptToken!;
+    await expect(attempts.load(publicId, attemptToken)).rejects.toMatchObject({
+      code: "ATTEMPT_UNAVAILABLE",
+    });
+    const replacement = await attempts.load(publicId, result.newAttemptToken);
+    expect(replacement.answers).toEqual({});
+    expect(replacement.generation).toBe(2);
     expect(
       (
         await pool.query(
@@ -234,6 +305,20 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
         )
       ).rows[0].count,
     ).toBe(1);
+    const archived = (
+      await pool.query(
+        "SELECT status,archive_reason,attempt_token_hash,payload_ciphertext FROM response_attempts WHERE survey_id=$1 ORDER BY generation",
+        [surveyId],
+      )
+    ).rows;
+    expect(archived.map((row) => row.status)).toEqual(["ARCHIVED", "CURRENT"]);
+    expect(archived[0]).toMatchObject({
+      archive_reason: "REPLACED",
+      attempt_token_hash: null,
+    });
+    expect(archived[0].payload_ciphertext).not.toEqual(
+      archived[1].payload_ciphertext,
+    );
     expect(
       (
         await pool.query(
@@ -270,7 +355,7 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
         "phase6-race-right",
       ),
     ]);
-    expect(results.filter((result) => result.newAttemptToken)).toHaveLength(1);
+    expect(results.filter((result) => result.newAttemptToken)).toHaveLength(2);
     const phoneGroups = await pool.query<{
       respondents: number;
       attempts: number;
@@ -280,7 +365,7 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
         WHERE r.survey_id=$1 AND r.phone_lookup_hash=(SELECT phone_lookup_hash FROM respondents WHERE survey_id=$1 ORDER BY created_at DESC LIMIT 1)`,
       [surveyId],
     );
-    expect(phoneGroups.rows[0]).toEqual({ respondents: 1, attempts: 1 });
+    expect(phoneGroups.rows[0]).toEqual({ respondents: 1, attempts: 2 });
   });
   it("blocks stale identity after ACTIVE changes to PENDING and still records PENDING Opens", async () => {
     let survey = await surveys.view(owner, surveyId);
@@ -296,6 +381,22 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
       "phase6-pending",
     );
     expect(pending.availability).toBe("PENDING");
+    const existing = await attempts.load(publicId, replacementToken);
+    expect(existing.editable).toBe(true);
+    const continued = await attempts.mutate(publicId, replacementToken, {
+      questionPosition: 3,
+      value: "Continued while pending",
+      generation: 2,
+      baseRevision: 0,
+      mutationId: "70000000-0000-4000-8000-000000000010",
+    });
+    expect(continued.revision).toBe(1);
+    expect(
+      await attempts.submit(publicId, replacementToken, {
+        generation: 2,
+        baseRevision: 1,
+      }),
+    ).toEqual({ submitted: false, missingRequiredPositions: [1] });
     await expect(
       respondents.identify(
         publicId,
@@ -325,6 +426,17 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
     ).toBe("UNAVAILABLE");
     const survey = await surveys.view(owner, surveyId);
     await surveys.transition(owner, surveyId, "COMPLETED", survey.stateVersion);
+    const completed = await attempts.load(publicId, replacementToken);
+    expect(completed).toMatchObject({ editable: false, recorded: true });
+    await expect(
+      attempts.mutate(publicId, replacementToken, {
+        questionPosition: 1,
+        value: 1,
+        generation: 2,
+        baseRevision: 1,
+        mutationId: "70000000-0000-4000-8000-000000000011",
+      }),
+    ).rejects.toMatchObject({ code: "ATTEMPT_CONFLICT" });
     expect(
       (await respondents.open(publicId, undefined, "completed")).availability,
     ).toBe("UNAVAILABLE");

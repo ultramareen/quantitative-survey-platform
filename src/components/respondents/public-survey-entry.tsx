@@ -50,12 +50,20 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
         const data = (await response
           .json()
           .catch(() => ({}))) as PublicSurveyOpenResult;
-        if (active)
-          setState(
-            response.ok
-              ? data
-              : { availability: "UNAVAILABLE", identified: false },
-          );
+        if (!active) return;
+        if (response.ok && data.availability !== "UNAVAILABLE") {
+          setState(data);
+          return;
+        }
+        const attempt = await fetch(
+          `/api/public/surveys/${encodeURIComponent(publicId)}/attempt`,
+          { cache: "no-store" },
+        );
+        setState(
+          attempt.ok
+            ? { availability: "ACTIVE", identified: true }
+            : { availability: "UNAVAILABLE", identified: false },
+        );
       })
       .catch(
         () =>
@@ -109,6 +117,7 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
         body="The survey cannot accept responses at this time."
       />
     );
+  if (state.identified) return <Questionnaire publicId={publicId} />;
   if (state.availability === "PENDING")
     return (
       <Unavailable
@@ -116,7 +125,6 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
         body="This survey is temporarily not accepting new responses."
       />
     );
-  if (state.identified) return <Questionnaire publicId={publicId} />;
   return (
     <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
       <p className="text-sm font-semibold tracking-wide text-blue-700 uppercase">
@@ -190,9 +198,12 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
 function Questionnaire({ publicId }: { publicId: string }) {
   const [attempt, setAttempt] = useState<PublicAttemptState>();
   const [saveState, setSaveState] = useState("Loading…");
+  const [submitted, setSubmitted] = useState(false);
+  const [missing, setMissing] = useState<number[]>([]);
   const queue = useRef(Promise.resolve());
   const attemptRef = useRef<PublicAttemptState | undefined>(undefined);
   const timers = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  const scheduledValues = useRef(new Map<number, PublicAnswerValue>());
   useEffect(() => {
     void fetch(`/api/public/surveys/${encodeURIComponent(publicId)}/attempt`, {
       cache: "no-store",
@@ -254,18 +265,75 @@ function Questionnaire({ publicId }: { publicId: string }) {
       .catch(() => setSaveState("Retry needed"));
   }
   function schedule(position: number, value: PublicAnswerValue, delay: number) {
+    scheduledValues.current.set(position, value);
     const current = timers.current.get(position);
     if (current) clearTimeout(current);
     timers.current.set(
       position,
       setTimeout(() => {
         timers.current.delete(position);
+        scheduledValues.current.delete(position);
         save(position, value);
       }, delay),
     );
   }
+  async function submit() {
+    for (const [position, value] of scheduledValues.current) {
+      const timer = timers.current.get(position);
+      if (timer) clearTimeout(timer);
+      timers.current.delete(position);
+      save(position, value);
+    }
+    scheduledValues.current.clear();
+    await queue.current;
+    const current = attemptRef.current;
+    if (!current) return;
+    setSaveState("Submitting…");
+    const response = await fetch(
+      `/api/public/surveys/${encodeURIComponent(publicId)}/attempt`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          generation: current.generation,
+          baseRevision: current.revision,
+        }),
+      },
+    );
+    const result = (await response.json().catch(() => ({}))) as {
+      submitted?: boolean;
+      missingRequiredPositions?: number[];
+      message?: string;
+    };
+    if (!response.ok) {
+      setSaveState(result.message ?? "Retry needed");
+      return;
+    }
+    if (!result.submitted) {
+      setMissing(result.missingRequiredPositions ?? []);
+      setSaveState("Answer the required questions shown below.");
+      return;
+    }
+    setMissing([]);
+    setSubmitted(true);
+    setSaveState("Saved");
+  }
   if (!attempt)
     return <Unavailable title="Opening your response" body={saveState} />;
+  if (attempt.recorded)
+    return (
+      <Unavailable
+        title={attempt.title}
+        body="Your response has already been recorded."
+      />
+    );
+  if (submitted)
+    return (
+      <Unavailable
+        title="Thank you"
+        body="Your response has been recorded. You may still edit it on this device during the permitted edit window."
+      />
+    );
   return (
     <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
       <h1 className="text-2xl font-semibold">{attempt.title}</h1>
@@ -283,9 +351,17 @@ function Questionnaire({ publicId }: { publicId: string }) {
             value={attempt.answers[String(q.position)]}
             save={(v) => save(q.position, v)}
             schedule={(v, delay) => schedule(q.position, v, delay)}
+            missing={missing.includes(q.position)}
           />
         ))}
       </div>
+      <button
+        type="button"
+        onClick={() => void submit()}
+        className="mt-8 rounded-lg bg-blue-700 px-5 py-3 font-medium text-white"
+      >
+        Submit response
+      </button>
     </section>
   );
 }
@@ -295,11 +371,13 @@ function QuestionField({
   value,
   save,
   schedule,
+  missing,
 }: {
   question: PublicQuestion;
   value: PublicAnswerValue | undefined;
   save: (value: PublicAnswerValue) => void;
   schedule: (value: PublicAnswerValue, delay: number) => void;
+  missing: boolean;
 }) {
   const heading = `${question.position}. ${question.prompt}`;
   if (question.type === "FREE_TEXT")
@@ -309,6 +387,11 @@ function QuestionField({
         <span className="text-sm font-normal text-slate-500">
           {question.required ? "Required" : "Optional"}
         </span>
+        {missing ? (
+          <span role="alert" className="text-sm text-red-700">
+            This required question needs an answer.
+          </span>
+        ) : null}
         <textarea
           className="min-h-32 rounded-lg border p-3"
           defaultValue={typeof value === "string" ? value : ""}
@@ -326,6 +409,11 @@ function QuestionField({
           {question.required ? "Required" : "Optional"}
         </span>
       </legend>
+      {missing ? (
+        <p role="alert" className="mt-2 text-sm text-red-700">
+          This required question needs an answer.
+        </p>
+      ) : null}
       <div className="mt-3 grid gap-2">
         {question.options.map((o) => (
           <label key={o.position} className="flex gap-3">
