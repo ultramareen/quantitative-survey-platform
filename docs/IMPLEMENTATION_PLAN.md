@@ -358,7 +358,7 @@ Phase 12 can begin its estimation model after Phase 5, but automatic protection 
 **Backend work:**
 
 - Create/list/view surveys.
-- Owner-only Draft editing.
+- Product Manager and Researcher owner-only Draft editing; Admin editing of any Draft.
 - Activation validation for 1–50 questions and 2–11 options per choice question.
 - Transactional instrument freeze.
 - Explicit transitions among DRAFT, ACTIVE, PENDING_CAPACITY, and COMPLETED.

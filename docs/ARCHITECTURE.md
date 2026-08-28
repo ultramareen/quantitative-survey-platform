@@ -191,7 +191,7 @@ All checks occur in server policies and services. Hidden buttons or missing rout
 | Export aggregate ResultsSnapshot without respondent rows/PII              | Yes                      | Yes                      | Yes                      |
 | Create/duplicate survey                                                   | Yes                      | Yes                      | Yes                      |
 | Edit own DRAFT                                                            | Yes                      | Yes                      | Yes                      |
-| Edit another owner’s DRAFT                                                | No                       | No                       | No                       |
+| Edit another owner’s DRAFT                                                | No                       | No                       | Yes                      |
 | Activate/pause/reactivate/complete own survey                             | Yes, subject to capacity | Yes, subject to capacity | Yes, subject to capacity |
 | Calculate own survey in A/P/C state                                       | Yes                      | Yes                      | Yes                      |
 | Manage another owner’s lifecycle/calculate                                | No                       | No                       | Yes                      |

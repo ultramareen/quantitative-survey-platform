@@ -23,6 +23,12 @@ export function InternalShell({
           >
             Workspace
           </Link>
+          <Link
+            className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-900"
+            href="/app/surveys"
+          >
+            Surveys
+          </Link>
           {employee.role === "ADMIN" ? (
             <Link
               className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-900"
