@@ -1,6 +1,7 @@
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { VersionedKeyRegistry } from "@/server/modules/cryptography/key-registry";
+import { PublicAttemptService } from "@/server/modules/attempts/service";
 import { PgRespondentRepository } from "@/server/modules/respondents/repository";
 import { PublicRespondentService } from "@/server/modules/respondents/service";
 import { PgSurveyRepository } from "@/server/modules/surveys/repository";
@@ -44,9 +45,11 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
     crypto,
     () => new Date(),
   );
+  const attempts = new PublicAttemptService(pool, crypto);
   let surveyId: string;
   let publicId: string;
   let openToken: string;
+  let attemptToken: string;
   beforeAll(async () => {
     const now = new Date();
     await pool.query(
@@ -58,6 +61,18 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
         title: "Public Phase 6",
         description: "Identity foundation",
         questions: [
+          {
+            prompt: "Pick one",
+            type: "SINGLE_CHOICE",
+            required: true,
+            options: ["Alpha", "Beta"],
+          },
+          {
+            prompt: "Pick many",
+            type: "MULTIPLE_CHOICE",
+            required: false,
+            options: ["Red", "Blue"],
+          },
           {
             prompt: "Comment",
             type: "FREE_TEXT",
@@ -111,6 +126,7 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
       "phase6-identify-a",
     );
     expect(result.newAttemptToken).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    attemptToken = result.newAttemptToken!;
     const row = (
       await pool.query(
         `SELECT r.id,r.reference_id,r.name_ciphertext,r.phone_ciphertext,r.phone_lookup_hash,p.respondent_id,a.status,a.attempt_token_hash,a.coverage_basis_count FROM respondents r JOIN public_survey_sessions p ON p.respondent_id=r.id JOIN response_attempts a ON a.respondent_id=r.id WHERE r.survey_id=$1`,
@@ -120,12 +136,86 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
     expect(row.reference_id).toMatch(/^R-/);
     expect(row.respondent_id).toBe(row.id);
     expect(row.status).toBe("CURRENT");
-    expect(row.coverage_basis_count).toBe(1);
+    expect(row.coverage_basis_count).toBe(3);
     expect(row.attempt_token_hash).toHaveLength(32);
     const serialized = JSON.stringify(row);
     expect(serialized).not.toContain("Synthetic Respondent");
     expect(serialized).not.toContain("+12025550123");
     expect(row.phone_lookup_hash).toHaveLength(32);
+  });
+  it("loads ordered public questions and autosaves encrypted typed answers", async () => {
+    let state = await attempts.load(publicId, attemptToken);
+    expect(state.questions.map((q) => q.type)).toEqual([
+      "SINGLE_CHOICE",
+      "MULTIPLE_CHOICE",
+      "FREE_TEXT",
+    ]);
+    expect(state.questions[0]?.options.map((o) => o.label)).toEqual([
+      "Alpha",
+      "Beta",
+    ]);
+    state = await attempts.mutate(publicId, attemptToken, {
+      questionPosition: 1,
+      value: 2,
+      generation: 1,
+      baseRevision: 0,
+      mutationId: "70000000-0000-4000-8000-000000000001",
+    });
+    state = await attempts.mutate(publicId, attemptToken, {
+      questionPosition: 2,
+      value: [2, 1],
+      generation: 1,
+      baseRevision: 1,
+      mutationId: "70000000-0000-4000-8000-000000000002",
+    });
+    state = await attempts.mutate(publicId, attemptToken, {
+      questionPosition: 3,
+      value: "Synthetic secret answer",
+      generation: 1,
+      baseRevision: 2,
+      mutationId: "70000000-0000-4000-8000-000000000003",
+    });
+    expect(state.answers).toEqual({
+      "1": 2,
+      "2": [1, 2],
+      "3": "Synthetic secret answer",
+    });
+    expect(state.revision).toBe(3);
+    const stored = (
+      await pool.query(
+        "SELECT payload_ciphertext::STRING encoded,answered_question_count FROM response_attempts WHERE attempt_token_hash IS NOT NULL AND survey_id=$1 ORDER BY created_at LIMIT 1",
+        [surveyId],
+      )
+    ).rows[0];
+    expect(stored.answered_question_count).toBe(3);
+    expect(stored.encoded).not.toContain("Synthetic secret answer");
+  });
+  it("keeps retries idempotent and refuses stale or invalid answer values", async () => {
+    const replay = await attempts.mutate(publicId, attemptToken, {
+      questionPosition: 3,
+      value: "Synthetic secret answer",
+      generation: 1,
+      baseRevision: 2,
+      mutationId: "70000000-0000-4000-8000-000000000003",
+    });
+    expect(replay.revision).toBe(3);
+    const stale = await attempts.mutate(publicId, attemptToken, {
+      questionPosition: 1,
+      value: 1,
+      generation: 1,
+      baseRevision: 0,
+      mutationId: "70000000-0000-4000-8000-000000000004",
+    });
+    expect(stale.revision).toBe(3);
+    await expect(
+      attempts.mutate(publicId, attemptToken, {
+        questionPosition: 1,
+        value: [1, 2],
+        generation: 1,
+        baseRevision: 3,
+        mutationId: "70000000-0000-4000-8000-000000000005",
+      }),
+    ).rejects.toMatchObject({ code: "INVALID_ANSWER" });
   });
   it("links a new-device Open for the same phone without restoring or replacing the attempt", async () => {
     const second = await respondents.open(publicId, undefined, "phase6-open-b");
