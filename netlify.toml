@@ -6,4 +6,5 @@
   NODE_VERSION = "24"
   PNPM_VERSION = "11.19.0"
 
-# Production deployment is explicitly outside Phase 0.
+# The Phase 12 usage evaluator is also declared in the function source. Netlify
+# runs it every three hours only for published production deployments.

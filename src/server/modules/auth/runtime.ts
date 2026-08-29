@@ -2,6 +2,7 @@ import "server-only";
 
 import { getServerEnvironment } from "@/server/config/env";
 import { createAuthMailAdapter } from "./mail";
+import { getInfrastructureService } from "@/server/modules/infrastructure/runtime";
 import { AuthRateLimiter } from "./rate-limit";
 import { PgAuthRepository } from "./repository";
 import { EmployeeAuthService } from "./service";
@@ -23,6 +24,8 @@ export function getEmployeeAuthService(): EmployeeAuthService {
         localMailboxPath: environment.LOCAL_MAILBOX_PATH,
         resendApiKey: environment.RESEND_API_KEY,
         resendFromEmail: environment.RESEND_FROM_EMAIL,
+        onResendDelivered: () =>
+          getInfrastructureService().recordResendDelivery(),
       }),
       environment.APP_ORIGIN,
     );

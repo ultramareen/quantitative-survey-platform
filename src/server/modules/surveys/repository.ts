@@ -176,6 +176,15 @@ export class PgSurveyRepository implements SurveyRepository {
     stateVersion: number;
   }) {
     await this.transaction(async (client) => {
+      await client.query(
+        `INSERT INTO infrastructure_control_state
+          (singleton_key,protection_state,effective_percent,evaluated_at,updated_at)
+         VALUES ('global','NORMAL',0,now(),now())
+         ON CONFLICT (singleton_key) DO NOTHING`,
+      );
+      const control = await client.query<{ effective_percent: string }>(
+        "SELECT effective_percent FROM infrastructure_control_state WHERE singleton_key='global' FOR UPDATE",
+      );
       const locked = await client.query<{
         status: SurveyStatus;
         state_version: number;
@@ -189,6 +198,17 @@ export class PgSurveyRepository implements SurveyRepository {
       if (row.status !== input.from || row.state_version !== input.stateVersion)
         throw conflict("The survey changed. Refresh and try again.");
       if (input.target === "ACTIVE") {
+        if (Number(control.rows[0]?.effective_percent ?? 0) >= 95) {
+          const active = await client.query<{ id: string }>(
+            `SELECT id FROM surveys
+              WHERE status='ACTIVE' AND tombstoned_at IS NULL
+              ORDER BY id FOR UPDATE`,
+          );
+          if (active.rows.some((survey) => survey.id !== input.surveyId))
+            throw conflict(
+              "Capacity protection permits at most one active survey.",
+            );
+        }
         const invalid = await client.query<{ count: string }>(
           `SELECT count(*)::STRING AS count FROM questions q WHERE q.survey_id=$1 AND ((q.type='FREE_TEXT' AND EXISTS (SELECT 1 FROM answer_options o WHERE o.question_id=q.id)) OR (q.type IN ('SINGLE_CHOICE','MULTIPLE_CHOICE') AND (SELECT count(*) FROM answer_options o WHERE o.question_id=q.id) NOT BETWEEN 2 AND 11))`,
           [input.surveyId],

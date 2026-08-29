@@ -62,6 +62,7 @@ export class ResendMailAdapter implements AuthMailAdapter {
   constructor(
     apiKey: string,
     private readonly sender: string,
+    private readonly onDelivered?: () => Promise<void>,
   ) {
     this.#client = new Resend(apiKey);
   }
@@ -74,6 +75,7 @@ export class ResendMailAdapter implements AuthMailAdapter {
       text: `Use this one-time link within 72 hours to create your account:\n\n${message.invitationUrl}\n\nIf you were not expecting this, you can ignore this message.`,
     });
     if (result.error) throw new Error("Invitation email delivery failed.");
+    await this.onDelivered?.();
   }
 
   async sendPasswordReset(message: PasswordResetMail): Promise<void> {
@@ -84,6 +86,7 @@ export class ResendMailAdapter implements AuthMailAdapter {
       text: `Use this link within 30 minutes to reset your password:\n\n${message.resetUrl}\n\nIf you did not request this, you can ignore this message.`,
     });
     if (result.error) throw new Error("Password reset email delivery failed.");
+    await this.onDelivered?.();
   }
 }
 
@@ -92,12 +95,17 @@ export function createAuthMailAdapter(input: {
   localMailboxPath?: string;
   resendApiKey?: string;
   resendFromEmail?: string;
+  onResendDelivered?: () => Promise<void>;
 }): AuthMailAdapter & InvitationMailAdapter {
   if (input.transport === "resend") {
     if (!input.resendApiKey || !input.resendFromEmail) {
       throw new Error("Resend mail transport is not configured.");
     }
-    return new ResendMailAdapter(input.resendApiKey, input.resendFromEmail);
+    return new ResendMailAdapter(
+      input.resendApiKey,
+      input.resendFromEmail,
+      input.onResendDelivered,
+    );
   }
   return new LocalFileMailAdapter(
     input.localMailboxPath ?? "/tmp/qsp-local-password-reset-mailbox.jsonl",
