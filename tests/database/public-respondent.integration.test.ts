@@ -4,6 +4,7 @@ import { VersionedKeyRegistry } from "@/server/modules/cryptography/key-registry
 import { PublicAttemptService } from "@/server/modules/attempts/service";
 import { PgRespondentRepository } from "@/server/modules/respondents/repository";
 import { PublicRespondentService } from "@/server/modules/respondents/service";
+import { ResultsService } from "@/server/modules/results/service";
 import { PgSurveyRepository } from "@/server/modules/surveys/repository";
 import { SurveyService } from "@/server/modules/surveys/service";
 import type { EmployeePrincipal } from "@/types/employee";
@@ -46,6 +47,7 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
     () => new Date(),
   );
   const attempts = new PublicAttemptService(pool, crypto);
+  const resultsService = new ResultsService(pool, crypto);
   let surveyId: string;
   let publicId: string;
   let openToken: string;
@@ -367,6 +369,66 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
     );
     expect(phoneGroups.rows[0]).toEqual({ respondents: 1, attempts: 2 });
   });
+  it("creates immutable aggregate-only snapshots and enforces owner/Admin authorization", async () => {
+    let state = await attempts.mutate(publicId, replacementToken, {
+      questionPosition: 1,
+      value: 1,
+      generation: 2,
+      baseRevision: 0,
+      mutationId: "70000000-0000-4000-8000-000000000020",
+    });
+    state = await attempts.mutate(publicId, replacementToken, {
+      questionPosition: 2,
+      value: [1, 2],
+      generation: 2,
+      baseRevision: state.revision,
+      mutationId: "70000000-0000-4000-8000-000000000021",
+    });
+    await attempts.mutate(publicId, replacementToken, {
+      questionPosition: 3,
+      value: "Grouped Secret",
+      generation: 2,
+      baseRevision: state.revision,
+      mutationId: "70000000-0000-4000-8000-000000000022",
+    });
+    const first = await resultsService.calculate(owner, surveyId);
+    expect(first.snapshotNumber).toBe(1);
+    expect(first.funnel.completed).toBe(1);
+    expect(first.questions[0]?.options?.[0]).toMatchObject({
+      count: 1,
+      leader: true,
+    });
+    expect(first.questions[1]?.options?.map((o) => o.count)).toEqual([1, 1]);
+    expect(first.questions[2]?.freeTextGroups?.[0]).toMatchObject({
+      label: "Grouped Secret",
+      count: 1,
+      leader: true,
+    });
+    const second = await resultsService.calculate(admin, surveyId);
+    expect(second.snapshotNumber).toBe(2);
+    const history = await resultsService.history(owner, surveyId);
+    expect(history.map((s) => s.snapshotNumber)).toEqual([2, 1]);
+    expect(
+      await resultsService.history(
+        { ...owner, id: "60000000-0000-4000-8000-000000000099" },
+        surveyId,
+      ),
+    ).toHaveLength(2);
+    await expect(
+      resultsService.calculate(
+        { ...owner, id: "60000000-0000-4000-8000-000000000099" },
+        surveyId,
+      ),
+    ).rejects.toMatchObject({ code: "RESULTS_DENIED" });
+    const stored = (
+      await pool.query(
+        "SELECT aggregate_results::STRING aggregate,free_text_ciphertext::STRING encrypted FROM results_snapshots WHERE survey_id=$1 ORDER BY snapshot_number LIMIT 1",
+        [surveyId],
+      )
+    ).rows[0];
+    expect(stored.aggregate).not.toContain("Grouped Secret");
+    expect(stored.encrypted).not.toContain("Grouped Secret");
+  });
   it("blocks stale identity after ACTIVE changes to PENDING and still records PENDING Opens", async () => {
     let survey = await surveys.view(owner, surveyId);
     await surveys.transition(
@@ -387,16 +449,16 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
       questionPosition: 3,
       value: "Continued while pending",
       generation: 2,
-      baseRevision: 0,
+      baseRevision: 3,
       mutationId: "70000000-0000-4000-8000-000000000010",
     });
-    expect(continued.revision).toBe(1);
+    expect(continued.revision).toBe(4);
     expect(
       await attempts.submit(publicId, replacementToken, {
         generation: 2,
-        baseRevision: 1,
+        baseRevision: 4,
       }),
-    ).toEqual({ submitted: false, missingRequiredPositions: [1] });
+    ).toEqual({ submitted: true, analyticallyComplete: true });
     await expect(
       respondents.identify(
         publicId,
@@ -414,6 +476,9 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
       ).rows[0].count,
     ).toBe(2);
     survey = await surveys.view(owner, surveyId);
+    expect(
+      (await resultsService.calculate(owner, surveyId)).snapshotNumber,
+    ).toBe(3);
     await surveys.transition(owner, surveyId, "ACTIVE", survey.stateVersion);
   });
   it("keeps Draft, Completed, tombstoned, unknown, and malformed links unavailable", async () => {
@@ -421,11 +486,18 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
       await surveys.create(owner, { title: "Draft", questions: [] })
     ).id;
     const draft = await surveys.view(owner, draftId);
+    await expect(
+      resultsService.calculate(owner, draftId),
+    ).rejects.toMatchObject({ code: "RESULTS_UNAVAILABLE" });
     expect(
       (await respondents.open(draft.publicId, undefined, "draft")).availability,
     ).toBe("UNAVAILABLE");
     const survey = await surveys.view(owner, surveyId);
     await surveys.transition(owner, surveyId, "COMPLETED", survey.stateVersion);
+    expect(
+      (await resultsService.calculate(admin, surveyId)).snapshotNumber,
+    ).toBe(4);
+    expect((await surveys.view(owner, surveyId)).status).toBe("COMPLETED");
     const completed = await attempts.load(publicId, replacementToken);
     expect(completed).toMatchObject({ editable: false, recorded: true });
     await expect(
@@ -433,7 +505,7 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
         questionPosition: 1,
         value: 1,
         generation: 2,
-        baseRevision: 1,
+        baseRevision: 4,
         mutationId: "70000000-0000-4000-8000-000000000011",
       }),
     ).rejects.toMatchObject({ code: "ATTEMPT_CONFLICT" });

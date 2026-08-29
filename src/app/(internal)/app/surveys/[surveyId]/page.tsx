@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import { SurveyActions } from "@/components/surveys/survey-actions";
 import { SurveyBuilder } from "@/components/surveys/survey-builder";
+import { SurveyResults } from "@/components/results/survey-results";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import { getSurveyService } from "@/server/modules/surveys/runtime";
+import { getResultsService } from "@/server/modules/results/runtime";
 
 export default async function SurveyPage({
   params,
@@ -20,6 +22,12 @@ export default async function SurveyPage({
   const canEdit =
     survey.status === "DRAFT" &&
     (employee.role === "ADMIN" || employee.id === survey.ownerId);
+  const canCalculate =
+    employee.role === "ADMIN" || employee.id === survey.ownerId;
+  const snapshots =
+    survey.status !== "DRAFT"
+      ? await getResultsService().history(employee, survey.id)
+      : [];
   return (
     <section>
       <p className="text-sm font-semibold tracking-wide text-blue-700 uppercase">
@@ -45,6 +53,13 @@ export default async function SurveyPage({
       ) : null}
       <SurveyActions survey={survey} employee={employee} />
       <SurveyBuilder survey={survey} readOnly={!canEdit} />
+      {survey.status !== "DRAFT" ? (
+        <SurveyResults
+          surveyId={survey.id}
+          initial={snapshots}
+          canCalculate={canCalculate}
+        />
+      ) : null}
     </section>
   );
 }
