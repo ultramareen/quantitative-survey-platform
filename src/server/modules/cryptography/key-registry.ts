@@ -59,11 +59,7 @@ export type CryptographyConfiguration = {
 export function parseCryptographyConfiguration(
   input: NodeJS.ProcessEnv,
 ): CryptographyConfiguration {
-  const piiEncryptionKeys = registryFromEnvironment(input, {
-    activeName: "PII_ENCRYPTION_ACTIVE_VERSION",
-    keyPrefix: "PII_ENCRYPTION_KEY_V",
-    keyLength: 32,
-  });
+  const piiEncryptionKeys = parsePiiEncryptionKeyRegistry(input);
   const phoneLookupKeys = registryFromEnvironment(input, {
     activeName: "PHONE_LOOKUP_HMAC_ACTIVE_VERSION",
     keyPrefix: "PHONE_LOOKUP_HMAC_KEY_V",
@@ -90,6 +86,16 @@ export function parseCryptographyConfiguration(
     phoneLookupKeys,
     rateLimitHmacKey: Buffer.from(rateLimitHmacKey),
   };
+}
+
+export function parsePiiEncryptionKeyRegistry(
+  input: NodeJS.ProcessEnv,
+): VersionedKeyRegistry {
+  return registryFromEnvironment(input, {
+    activeName: "PII_ENCRYPTION_ACTIVE_VERSION",
+    keyPrefix: "PII_ENCRYPTION_KEY_V",
+    keyLength: 32,
+  });
 }
 
 function registryFromEnvironment(

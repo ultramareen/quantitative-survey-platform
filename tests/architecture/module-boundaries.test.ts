@@ -31,6 +31,7 @@ describe("module boundaries", () => {
       "employees",
       "exports",
       "infrastructure",
+      "maintenance",
       "respondents",
       "results",
       "surveys",
@@ -75,6 +76,8 @@ describe("module boundaries", () => {
       "src/server/modules/cryptography/password.ts",
       "src/server/modules/cryptography/reference-id.ts",
       "src/server/modules/cryptography/tokens.ts",
+      "src/server/modules/maintenance/backup-archive.ts",
+      "src/server/modules/maintenance/restore-verifier.ts",
     ];
 
     for (const path of sensitiveEntryPoints) {
