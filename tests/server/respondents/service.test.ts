@@ -117,6 +117,9 @@ describe("public respondent service", () => {
       status: 404,
     });
     await expect(
+      service.open("R-7K3M9W2X8Q4D", undefined, "ip"),
+    ).rejects.toMatchObject({ status: 404 });
+    await expect(
       service.identify(
         publicId,
         "invalid",

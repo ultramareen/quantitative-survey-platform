@@ -48,6 +48,21 @@ describe("responsive and accessible foundation primitives", () => {
     ).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass("lg:grid");
     expect(screen.getByRole("main")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Respondents" })).toHaveAttribute(
+      "href",
+      "/app/respondents",
+    );
+  });
+
+  it("does not render respondent navigation for Product Managers", () => {
+    render(
+      <InternalShell employee={{ ...employee, role: "PRODUCT_MANAGER" }}>
+        <h1>Internal content</h1>
+      </InternalShell>,
+    );
+    expect(
+      screen.queryByRole("link", { name: "Respondents" }),
+    ).not.toBeInTheDocument();
   });
 
   it("connects form labels and errors accessibly", () => {

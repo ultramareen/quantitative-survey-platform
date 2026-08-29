@@ -4,6 +4,8 @@ import { VersionedKeyRegistry } from "@/server/modules/cryptography/key-registry
 import { PublicAttemptService } from "@/server/modules/attempts/service";
 import { PgRespondentRepository } from "@/server/modules/respondents/repository";
 import { PublicRespondentService } from "@/server/modules/respondents/service";
+import { PgInternalRespondentRepository } from "@/server/modules/respondents/internal-repository";
+import { InternalRespondentService } from "@/server/modules/respondents/internal-service";
 import { ResultsService } from "@/server/modules/results/service";
 import { PgSurveyRepository } from "@/server/modules/surveys/repository";
 import { SurveyService } from "@/server/modules/surveys/service";
@@ -46,6 +48,10 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
     crypto,
     () => new Date(),
   );
+  const internalRespondents = new InternalRespondentService(
+    new PgInternalRespondentRepository(pool),
+    crypto,
+  );
   const attempts = new PublicAttemptService(pool, crypto);
   const resultsService = new ResultsService(pool, crypto);
   let surveyId: string;
@@ -53,6 +59,7 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
   let openToken: string;
   let attemptToken: string;
   let replacementToken: string;
+  let referenceId: string;
   beforeAll(async () => {
     const now = new Date();
     await pool.query(
@@ -137,6 +144,7 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
       )
     ).rows[0];
     expect(row.reference_id).toMatch(/^R-/);
+    referenceId = row.reference_id;
     expect(row.respondent_id).toBe(row.id);
     expect(row.status).toBe("CURRENT");
     expect(row.coverage_basis_count).toBe(3);
@@ -145,6 +153,34 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
     expect(serialized).not.toContain("Synthetic Respondent");
     expect(serialized).not.toContain("+12025550123");
     expect(row.phone_lookup_hash).toHaveLength(32);
+  });
+  it("allows cross-owner Admin PII search, audits safely, and denies Product Manager access", async () => {
+    const result = await internalRespondents.list(admin, {
+      referenceId: referenceId.toLowerCase(),
+    });
+    expect(result.respondents).toHaveLength(1);
+    expect(result.respondents[0]).toMatchObject({
+      referenceId,
+      name: "Synthetic Respondent",
+      phone: "+12025550123",
+      survey: { id: surveyId },
+      coverage: { answeredQuestions: 0, totalQuestions: 3 },
+      state: "EDITABLE",
+    });
+    await expect(
+      internalRespondents.detail(owner, referenceId),
+    ).rejects.toMatchObject({ status: 403 });
+    const audit = (
+      await pool.query<{ safe_metadata: unknown; affected_rows: number }>(
+        "SELECT safe_metadata,affected_rows FROM audit_events WHERE actor_user_id=$1 AND action='RESPONDENT_PII_SEARCHED' ORDER BY created_at DESC LIMIT 1",
+        [admin.id],
+      )
+    ).rows[0];
+    expect(audit.affected_rows).toBe(1);
+    expect(JSON.stringify(audit.safe_metadata)).not.toContain(
+      "Synthetic Respondent",
+    );
+    expect(JSON.stringify(audit.safe_metadata)).not.toContain("+12025550123");
   });
   it("loads ordered public questions and autosaves encrypted typed answers", async () => {
     let state = await attempts.load(publicId, attemptToken);
