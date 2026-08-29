@@ -5,10 +5,12 @@ export function SurveyResults({
   surveyId,
   initial,
   canCalculate,
+  canExportRespondents,
 }: {
   surveyId: string;
   initial: ResultsSnapshotDto[];
   canCalculate: boolean;
+  canExportRespondents: boolean;
 }) {
   const [history, setHistory] = useState(initial);
   const [busy, setBusy] = useState(false);
@@ -61,7 +63,11 @@ export function SurveyResults({
           No calculated snapshot exists yet.
         </p>
       ) : (
-        <Snapshot snapshot={latest} />
+        <Snapshot
+          snapshot={latest}
+          surveyId={surveyId}
+          canExportRespondents={canExportRespondents}
+        />
       )}{" "}
       {history.length ? (
         <div className="mt-8">
@@ -79,7 +85,15 @@ export function SurveyResults({
     </section>
   );
 }
-function Snapshot({ snapshot }: { snapshot: ResultsSnapshotDto }) {
+function Snapshot({
+  snapshot,
+  surveyId,
+  canExportRespondents,
+}: {
+  snapshot: ResultsSnapshotDto;
+  surveyId: string;
+  canExportRespondents: boolean;
+}) {
   const f = snapshot.funnel;
   return (
     <div className="mt-6">
@@ -87,6 +101,36 @@ function Snapshot({ snapshot }: { snapshot: ResultsSnapshotDto }) {
         Snapshot {snapshot.snapshotNumber} · cutoff{" "}
         {new Date(snapshot.dataCutoffAt).toLocaleString()}
       </p>
+      <div className="mt-4 rounded-lg border bg-slate-50 p-4">
+        <h3 className="font-semibold">XLSX exports</h3>
+        <p className="mt-1 text-sm text-slate-600">
+          Snapshot exports use the displayed immutable cutoff. Current,
+          archived, and free-text exports are timestamped current-state files.
+          Large datasets are split into deterministic bounded parts; each file
+          identifies its part and export time. When a workbook reports more than
+          one part, download the remaining files from the same export URL by
+          adding <code>?part=2</code>, then 3, through the reported total (or{" "}
+          <code>&amp;part=2</code> when the URL already has a question or
+          snapshot parameter).
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <ExportLink
+            href={`/api/surveys/${surveyId}/exports/aggregate?snapshotNumber=${snapshot.snapshotNumber}`}
+          >
+            Aggregate snapshot
+          </ExportLink>
+          {canExportRespondents ? (
+            <>
+              <ExportLink href={`/api/surveys/${surveyId}/exports/current`}>
+                Current Raw
+              </ExportLink>
+              <ExportLink href={`/api/surveys/${surveyId}/exports/archived`}>
+                Archived Attempts
+              </ExportLink>
+            </>
+          ) : null}
+        </div>
+      </div>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left">
           <thead>
@@ -155,9 +199,36 @@ function Snapshot({ snapshot }: { snapshot: ResultsSnapshotDto }) {
                 Top 10 of {q.uniqueGroupCount} grouped answers
               </p>
             ) : null}
+            {canExportRespondents && q.type === "FREE_TEXT" ? (
+              <ExportLink
+                href={`/api/surveys/${surveyId}/exports/free-text?questionPosition=${q.position}`}
+                className="mt-3 inline-block"
+              >
+                Export respondent-level free text
+              </ExportLink>
+            ) : null}
           </article>
         ))}
       </div>
     </div>
+  );
+}
+
+function ExportLink({
+  href,
+  children,
+  className = "",
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <a
+      href={href}
+      className={`rounded-lg border border-blue-700 px-3 py-2 text-sm font-medium text-blue-800 hover:bg-blue-50 ${className}`}
+    >
+      {children}
+    </a>
   );
 }

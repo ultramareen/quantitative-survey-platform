@@ -58,6 +58,9 @@ export default async function SurveyPage({
           surveyId={survey.id}
           initial={snapshots}
           canCalculate={canCalculate}
+          canExportRespondents={
+            employee.role === "RESEARCHER" || employee.role === "ADMIN"
+          }
         />
       ) : null}
     </section>
