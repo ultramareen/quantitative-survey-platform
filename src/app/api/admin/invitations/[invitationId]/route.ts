@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import {
   managementError,
@@ -16,7 +17,7 @@ export async function POST(
     requireTrustedMutation(request);
     const actor = await getCurrentEmployee();
     const { invitationId } = await context.params;
-    const { action } = schema.parse(await request.json());
+    const { action } = await parseJsonRequest(request, schema, 1_024);
     const service = getEmployeeManagementService();
     const result =
       action === "resend"

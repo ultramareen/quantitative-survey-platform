@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { NextRequest } from "next/server";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import {
   infrastructureError,
@@ -33,7 +34,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     requireTrustedMutation(request);
-    const input = reconciliation.parse(await request.json());
+    const input = await parseJsonRequest(request, reconciliation, 4_096);
     await getInfrastructureService().reconcile(
       await getCurrentEmployee(),
       input,

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import {
   requireTrustedMutation,
   surveyError,
@@ -23,7 +24,7 @@ export async function POST(
 ) {
   try {
     requireTrustedMutation(request);
-    const body = schema.parse(await request.json());
+    const body = await parseJsonRequest(request, schema, 4_096);
     const id = (await context.params).surveyId;
     const service = getSurveyService();
     const result =

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getServerEnvironment } from "@/server/config/env";
 import { secureCookieOptions } from "@/server/http/cookies";
 import { assertTrustedMutationOrigin } from "@/server/http/csrf";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import {
   publicError,
   publicRateSubject,
@@ -27,13 +28,7 @@ export async function POST(
 ) {
   try {
     assertTrustedMutationOrigin(request, getServerEnvironment().APP_ORIGIN);
-    const length = Number(request.headers.get("content-length") ?? 0);
-    if (length > 4096)
-      return NextResponse.json(
-        { message: "The request is too large." },
-        { status: 413 },
-      );
-    const body = schema.parse(await request.json());
+    const body = await parseJsonRequest(request, schema, 4_096);
     const { publicId } = await context.params;
     const result = await getPublicRespondentService().identify(
       publicId,

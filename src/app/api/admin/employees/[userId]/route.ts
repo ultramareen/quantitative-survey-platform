@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import {
   managementError,
@@ -25,7 +26,7 @@ export async function PATCH(
     requireTrustedMutation(request);
     const actor = await getCurrentEmployee();
     const { userId } = await context.params;
-    const body = bodySchema.parse(await request.json());
+    const body = await parseJsonRequest(request, bodySchema, 4_096);
     const service = getEmployeeManagementService();
     if (body.action === "change-role")
       await service.changeRole(actor, userId, body.role);

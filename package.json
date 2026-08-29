@@ -27,10 +27,12 @@
     "test:boundaries": "vitest run tests/architecture",
     "test:db": "node scripts/run-database-tests.mjs",
     "test:bundle": "node --import tsx scripts/check-client-bundle.ts",
+    "test:artifacts": "node --conditions=react-server --import tsx scripts/check-production-artifacts.ts",
+    "release:evidence": "node --conditions=react-server --import tsx scripts/check-release-evidence.ts",
     "db:migrate": "prisma migrate deploy",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
-    "verify": "node scripts/check-frozen-docs.mjs && prisma generate && tsc --noEmit && eslint . --max-warnings=0 && prettier --check . && vitest run && prisma validate && node scripts/run-database-tests.mjs && node --conditions=react-server --import tsx scripts/check-env.ts && next build --webpack && node --import tsx scripts/check-client-bundle.ts && node scripts/check-frozen-docs.mjs"
+    "verify": "node scripts/check-frozen-docs.mjs && prisma generate && tsc --noEmit && eslint . --max-warnings=0 && prettier --check . && vitest run && prisma validate && node scripts/run-database-tests.mjs && node --conditions=react-server --import tsx scripts/check-env.ts && next build --webpack && node --import tsx scripts/check-client-bundle.ts && node --conditions=react-server --import tsx scripts/check-production-artifacts.ts && node scripts/check-frozen-docs.mjs"
   },
   "dependencies": {
     "@prisma/client": "7.10.0",

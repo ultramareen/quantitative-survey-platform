@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import {
   managementError,
@@ -28,7 +29,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     requireTrustedMutation(request);
-    const body = createSchema.parse(await request.json());
+    const body = await parseJsonRequest(request, createSchema, 4_096);
     return NextResponse.json(
       await getEmployeeManagementService().createInvitation(
         await getCurrentEmployee(),

@@ -11,6 +11,7 @@ const globalDatabase = globalThis as typeof globalThis & {
 export function getDatabasePool(): Pool {
   globalDatabase.quantitativeSurveyPool ??= new Pool({
     connectionString: getServerEnvironment().DATABASE_URL,
+    connectionTimeoutMillis: 3_000,
     max: 10,
   });
   return globalDatabase.quantitativeSurveyPool;

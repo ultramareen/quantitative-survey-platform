@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import {
   managementError,
   requireTrustedMutation,
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     requireTrustedMutation(request);
-    const body = acceptSchema.parse(await request.json());
+    const body = await parseJsonRequest(request, acceptSchema, 4_096);
     await getEmployeeManagementService().accept(body);
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -30,6 +30,9 @@ describe("responsive and accessible foundation primitives", () => {
 
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(
+      screen.getByRole("link", { name: "Skip to main content" }),
+    ).toHaveAttribute("href", "#main-content");
+    expect(
       screen.getByRole("link", { name: "Quantitative Survey Platform" }),
     ).toHaveAttribute("href", "/");
   });
@@ -47,6 +50,7 @@ describe("responsive and accessible foundation primitives", () => {
       }),
     ).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass("lg:grid");
+    expect(screen.getByRole("navigation")).toHaveClass("flex-wrap");
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Respondents" })).toHaveAttribute(
       "href",

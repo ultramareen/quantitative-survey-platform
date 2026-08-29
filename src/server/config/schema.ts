@@ -6,6 +6,16 @@ import {
   type CryptographyConfiguration,
 } from "@/server/modules/cryptography/key-registry";
 
+const emailAddressSchema = z.email();
+const resendSenderSchema = z
+  .string()
+  .max(320)
+  .refine((value) => {
+    if (emailAddressSchema.safeParse(value).success) return true;
+    const match = /^([^<>\r\n]{1,200}) <([^<>\r\n]+)>$/.exec(value);
+    return Boolean(match && emailAddressSchema.safeParse(match[2]).success);
+  }, "must be an email or a display name followed by an email");
+
 const serverEnvironmentSchema = z
   .object({
     APP_ENV: z.enum(["development", "test", "preview", "production"]),
@@ -32,8 +42,9 @@ const serverEnvironmentSchema = z
     MAIL_TRANSPORT: z.enum(["local-file", "resend"]).default("local-file"),
     LOCAL_MAILBOX_PATH: z.string().min(1).optional(),
     RESEND_API_KEY: z.string().min(1).optional(),
-    RESEND_FROM_EMAIL: z.email().optional(),
+    RESEND_FROM_EMAIL: resendSenderSchema.optional(),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
+    QSP_SMOKE_TOKEN: z.string().min(32).optional(),
   })
   .superRefine((environment, context) => {
     if (
@@ -55,6 +66,17 @@ const serverEnvironmentSchema = z
         code: "custom",
         path: ["RESEND_API_KEY"],
         message: "Resend credentials are required",
+      });
+    }
+    if (
+      (environment.APP_ENV === "preview" ||
+        environment.APP_ENV === "production") &&
+      !environment.QSP_SMOKE_TOKEN
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["QSP_SMOKE_TOKEN"],
+        message: "preview and production require a smoke-test token",
       });
     }
   });

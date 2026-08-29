@@ -24,6 +24,7 @@ export default defineConfig([
   },
   globalIgnores([
     ".next/**",
+    ".pnpm-store/**",
     "coverage/**",
     "docs/**",
     "generated/**",

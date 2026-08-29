@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { NextRequest } from "next/server";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import {
   infrastructureError,
@@ -20,7 +21,7 @@ const actionSchema = z.discriminatedUnion("action", [
 export async function POST(request: NextRequest) {
   try {
     requireTrustedMutation(request);
-    const input = actionSchema.parse(await request.json());
+    const input = await parseJsonRequest(request, actionSchema, 4_096);
     const service = getInfrastructureService();
     if (input.action === "pause-all")
       return Response.json(

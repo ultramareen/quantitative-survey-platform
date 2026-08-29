@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { getServerEnvironment } from "@/server/config/env";
 import { assertTrustedMutationOrigin } from "@/server/http/csrf";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import { getPublicAttemptService } from "@/server/modules/attempts/runtime";
 import { attemptCookieName } from "@/server/modules/respondents/constants";
 import { publicError } from "@/server/modules/respondents/http";
@@ -51,12 +52,7 @@ export async function PATCH(
 ) {
   try {
     assertTrustedMutationOrigin(request, getServerEnvironment().APP_ORIGIN);
-    if (Number(request.headers.get("content-length") ?? 0) > 16_384)
-      return NextResponse.json(
-        { message: "The request is too large." },
-        { status: 413 },
-      );
-    const body = mutationSchema.parse(await request.json());
+    const body = await parseJsonRequest(request, mutationSchema, 16_384);
     const { publicId } = await context.params;
     const state = await getPublicAttemptService().mutate(
       publicId,
@@ -77,12 +73,7 @@ export async function POST(
 ) {
   try {
     assertTrustedMutationOrigin(request, getServerEnvironment().APP_ORIGIN);
-    if (Number(request.headers.get("content-length") ?? 0) > 4096)
-      return NextResponse.json(
-        { message: "The request is too large." },
-        { status: 413 },
-      );
-    const body = submitSchema.parse(await request.json());
+    const body = await parseJsonRequest(request, submitSchema, 4_096);
     const { publicId } = await context.params;
     const result = await getPublicAttemptService().submit(
       publicId,

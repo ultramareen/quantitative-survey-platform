@@ -16,10 +16,13 @@ describe("security header baseline", () => {
       "X-Frame-Options",
       "Referrer-Policy",
       "Permissions-Policy",
+      "Cross-Origin-Opener-Policy",
+      "X-DNS-Prefetch-Control",
     ]) {
       expect(config).toContain(header);
     }
     expect(config).toContain("frame-ancestors 'none'");
     expect(config).toContain("object-src 'none'");
+    expect(config).toContain("productionBrowserSourceMaps: false");
   });
 });

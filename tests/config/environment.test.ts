@@ -63,9 +63,46 @@ describe("server environment", () => {
         APP_ORIGIN: "https://survey.example.com",
         MAIL_TRANSPORT: "resend",
         RESEND_API_KEY: "synthetic-resend-placeholder",
-        RESEND_FROM_EMAIL: "no-reply@synthetic.invalid",
+        RESEND_FROM_EMAIL: "Survey Platform <no-reply@synthetic.invalid>",
+        QSP_SMOKE_TOKEN: "synthetic-smoke-token-at-least-32-characters",
       }).MAIL_TRANSPORT,
     ).toBe("resend");
+  });
+
+  it("accepts a bounded Resend display-name sender and rejects unsafe syntax", () => {
+    const production = {
+      ...validEnvironment,
+      APP_ENV: "production" as const,
+      APP_ORIGIN: "https://survey.example.com",
+      MAIL_TRANSPORT: "resend" as const,
+      RESEND_API_KEY: "synthetic-resend-placeholder",
+      QSP_SMOKE_TOKEN: "synthetic-smoke-token-at-least-32-characters",
+    };
+    expect(
+      parseServerEnvironment({
+        ...production,
+        RESEND_FROM_EMAIL: "Survey Platform <no-reply@synthetic.invalid>",
+      }).RESEND_FROM_EMAIL,
+    ).toBe("Survey Platform <no-reply@synthetic.invalid>");
+    expect(() =>
+      parseServerEnvironment({
+        ...production,
+        RESEND_FROM_EMAIL: "Unsafe\nSender <no-reply@synthetic.invalid>",
+      }),
+    ).toThrow("RESEND_FROM_EMAIL");
+  });
+
+  it("requires a dedicated smoke token in preview and production", () => {
+    expect(() =>
+      parseServerEnvironment({
+        ...validEnvironment,
+        APP_ENV: "preview",
+        APP_ORIGIN: "https://preview.example.com",
+        MAIL_TRANSPORT: "resend",
+        RESEND_API_KEY: "synthetic-resend-placeholder",
+        RESEND_FROM_EMAIL: "no-reply@synthetic.invalid",
+      }),
+    ).toThrow("QSP_SMOKE_TOKEN");
   });
 
   it("fails closed when the active encryption key is missing", () => {

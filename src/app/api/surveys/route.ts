@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
+import { parseJsonRequest } from "@/server/http/request-validation";
 import {
   requireTrustedMutation,
   surveyError,
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
     requireTrustedMutation(request);
     const result = await getSurveyService().create(
       await getCurrentEmployee(),
-      surveySchema.parse(await request.json()),
+      await parseJsonRequest(request, surveySchema, 1_048_576),
     );
     return NextResponse.json(result, { status: 201 });
   } catch (error) {
