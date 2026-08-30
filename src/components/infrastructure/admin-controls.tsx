@@ -161,7 +161,7 @@ export function InfrastructureAdminControls({
           >
             <option>NETLIFY</option>
             <option>COCKROACH</option>
-            <option>RESEND</option>
+            <option>BREVO</option>
           </select>
         </label>
         <label>

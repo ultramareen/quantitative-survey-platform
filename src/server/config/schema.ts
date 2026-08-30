@@ -7,14 +7,11 @@ import {
 } from "@/server/modules/cryptography/key-registry";
 
 const emailAddressSchema = z.email();
-const resendSenderSchema = z
+const senderNameSchema = z
   .string()
-  .max(320)
-  .refine((value) => {
-    if (emailAddressSchema.safeParse(value).success) return true;
-    const match = /^([^<>\r\n]{1,200}) <([^<>\r\n]+)>$/.exec(value);
-    return Boolean(match && emailAddressSchema.safeParse(match[2]).success);
-  }, "must be an email or a display name followed by an email");
+  .min(1)
+  .max(100)
+  .refine((value) => !/[\r\n]/.test(value), "must not contain newlines");
 
 const serverEnvironmentSchema = z
   .object({
@@ -39,10 +36,11 @@ const serverEnvironmentSchema = z
         },
       ),
     BETTER_AUTH_SECRET: z.string().min(32),
-    MAIL_TRANSPORT: z.enum(["local-file", "resend"]).default("local-file"),
+    MAIL_TRANSPORT: z.enum(["local-file", "brevo"]).default("local-file"),
     LOCAL_MAILBOX_PATH: z.string().min(1).optional(),
-    RESEND_API_KEY: z.string().min(1).optional(),
-    RESEND_FROM_EMAIL: resendSenderSchema.optional(),
+    BREVO_API_KEY: z.string().min(1).optional(),
+    BREVO_FROM_EMAIL: emailAddressSchema.optional(),
+    BREVO_FROM_NAME: senderNameSchema.optional(),
     LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
     QSP_SMOKE_TOKEN: z.string().min(32).optional(),
   })
@@ -50,22 +48,24 @@ const serverEnvironmentSchema = z
     if (
       (environment.APP_ENV === "preview" ||
         environment.APP_ENV === "production") &&
-      environment.MAIL_TRANSPORT !== "resend"
+      environment.MAIL_TRANSPORT !== "brevo"
     ) {
       context.addIssue({
         code: "custom",
         path: ["MAIL_TRANSPORT"],
-        message: "preview and production require the Resend transport",
+        message: "preview and production require the Brevo transport",
       });
     }
     if (
-      environment.MAIL_TRANSPORT === "resend" &&
-      (!environment.RESEND_API_KEY || !environment.RESEND_FROM_EMAIL)
+      environment.MAIL_TRANSPORT === "brevo" &&
+      (!environment.BREVO_API_KEY ||
+        !environment.BREVO_FROM_EMAIL ||
+        !environment.BREVO_FROM_NAME)
     ) {
       context.addIssue({
         code: "custom",
-        path: ["RESEND_API_KEY"],
-        message: "Resend credentials are required",
+        path: ["BREVO_API_KEY"],
+        message: "Brevo credentials and verified sender are required",
       });
     }
     if (

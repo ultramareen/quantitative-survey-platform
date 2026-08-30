@@ -15,10 +15,11 @@ export function getEmployeeManagementService() {
       createAuthMailAdapter({
         transport: env.MAIL_TRANSPORT,
         localMailboxPath: env.LOCAL_MAILBOX_PATH,
-        resendApiKey: env.RESEND_API_KEY,
-        resendFromEmail: env.RESEND_FROM_EMAIL,
-        onResendDelivered: () =>
-          getInfrastructureService().recordResendDelivery(),
+        brevoApiKey: env.BREVO_API_KEY,
+        brevoFromEmail: env.BREVO_FROM_EMAIL,
+        brevoFromName: env.BREVO_FROM_NAME,
+        onBrevoDelivered: () =>
+          getInfrastructureService().recordBrevoDelivery(),
       }),
       env.APP_ORIGIN,
     );

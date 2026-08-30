@@ -3,8 +3,6 @@ import "server-only";
 import { appendFile, chmod, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { Resend } from "resend";
-
 export type PasswordResetMail = {
   recipient: string;
   resetUrl: string;
@@ -56,55 +54,81 @@ export class LocalFileMailAdapter implements AuthMailAdapter {
   }
 }
 
-export class ResendMailAdapter implements AuthMailAdapter {
-  readonly #client: Resend;
-
+export class BrevoMailAdapter implements AuthMailAdapter {
   constructor(
-    apiKey: string,
-    private readonly sender: string,
+    private readonly apiKey: string,
+    private readonly sender: { email: string; name: string },
     private readonly onDelivered?: () => Promise<void>,
-  ) {
-    this.#client = new Resend(apiKey);
-  }
+    private readonly request: typeof fetch = fetch,
+  ) {}
 
   async sendInvitation(message: InvitationMail): Promise<void> {
-    const result = await this.#client.emails.send({
-      from: this.sender,
-      to: message.recipient,
+    await this.send({
+      to: [{ email: message.recipient }],
       subject: "Your Quantitative Survey Platform invitation",
-      text: `Use this one-time link within 72 hours to create your account:\n\n${message.invitationUrl}\n\nIf you were not expecting this, you can ignore this message.`,
+      textContent: `Use this one-time link within 72 hours to create your account:\n\n${message.invitationUrl}\n\nIf you were not expecting this, you can ignore this message.`,
+      failureMessage: "Invitation email delivery failed.",
     });
-    if (result.error) throw new Error("Invitation email delivery failed.");
     await this.onDelivered?.();
   }
 
   async sendPasswordReset(message: PasswordResetMail): Promise<void> {
-    const result = await this.#client.emails.send({
-      from: this.sender,
-      to: message.recipient,
+    await this.send({
+      to: [{ email: message.recipient }],
       subject: "Reset your Quantitative Survey Platform password",
-      text: `Use this link within 30 minutes to reset your password:\n\n${message.resetUrl}\n\nIf you did not request this, you can ignore this message.`,
+      textContent: `Use this link within 30 minutes to reset your password:\n\n${message.resetUrl}\n\nIf you did not request this, you can ignore this message.`,
+      failureMessage: "Password reset email delivery failed.",
     });
-    if (result.error) throw new Error("Password reset email delivery failed.");
     await this.onDelivered?.();
+  }
+
+  private async send(input: {
+    to: { email: string }[];
+    subject: string;
+    textContent: string;
+    failureMessage: string;
+  }) {
+    try {
+      const response = await this.request(
+        "https://api.brevo.com/v3/smtp/email",
+        {
+          method: "POST",
+          headers: {
+            accept: "application/json",
+            "api-key": this.apiKey,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify({
+            sender: this.sender,
+            to: input.to,
+            subject: input.subject,
+            textContent: input.textContent,
+          }),
+        },
+      );
+      if (!response.ok) throw new Error(input.failureMessage);
+    } catch {
+      throw new Error(input.failureMessage);
+    }
   }
 }
 
 export function createAuthMailAdapter(input: {
-  transport: "local-file" | "resend";
+  transport: "local-file" | "brevo";
   localMailboxPath?: string;
-  resendApiKey?: string;
-  resendFromEmail?: string;
-  onResendDelivered?: () => Promise<void>;
+  brevoApiKey?: string;
+  brevoFromEmail?: string;
+  brevoFromName?: string;
+  onBrevoDelivered?: () => Promise<void>;
 }): AuthMailAdapter & InvitationMailAdapter {
-  if (input.transport === "resend") {
-    if (!input.resendApiKey || !input.resendFromEmail) {
-      throw new Error("Resend mail transport is not configured.");
+  if (input.transport === "brevo") {
+    if (!input.brevoApiKey || !input.brevoFromEmail || !input.brevoFromName) {
+      throw new Error("Brevo mail transport is not configured.");
     }
-    return new ResendMailAdapter(
-      input.resendApiKey,
-      input.resendFromEmail,
-      input.onResendDelivered,
+    return new BrevoMailAdapter(
+      input.brevoApiKey,
+      { email: input.brevoFromEmail, name: input.brevoFromName },
+      input.onBrevoDelivered,
     );
   }
   return new LocalFileMailAdapter(

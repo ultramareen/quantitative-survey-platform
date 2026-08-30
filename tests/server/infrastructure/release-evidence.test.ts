@@ -13,7 +13,7 @@ const complete = {
   syntheticOnly: true as const,
   netlifyFreeNoRecharge: item,
   cockroachZeroDollarLimit: item,
-  resendFreeAndDomainVerified: item,
+  brevoFreeAndSenderVerified: item,
   nativeProviderAlerts: item,
   scheduledFunctionDelivery: item,
   previewSmoke: item,

@@ -21,7 +21,7 @@ export const productionReleaseEvidenceSchema = z
     syntheticOnly: z.literal(true),
     netlifyFreeNoRecharge: evidenceItem,
     cockroachZeroDollarLimit: evidenceItem,
-    resendFreeAndDomainVerified: evidenceItem,
+    brevoFreeAndSenderVerified: evidenceItem,
     nativeProviderAlerts: evidenceItem,
     scheduledFunctionDelivery: evidenceItem,
     previewSmoke: evidenceItem,

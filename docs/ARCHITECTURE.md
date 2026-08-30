@@ -14,7 +14,7 @@
 
 ## A. Executive architecture
 
-The MVP is a TypeScript modular monolith built with Next.js, React and Tailwind CSS. It runs on Netlify Free, stores its relational data in CockroachDB Cloud Basic through Prisma, uses self-hosted Better Auth for employee authentication, Resend Free for employee transactional email, and ExcelJS for on-demand XLSX generation.
+The MVP is a TypeScript modular monolith built with Next.js, React and Tailwind CSS. It runs on Netlify Free, stores its relational data in CockroachDB Cloud Basic through Prisma, uses self-hosted Better Auth for employee authentication, Brevo Free for employee transactional email, and ExcelJS for on-demand XLSX generation.
 
 The mandatory infrastructure cost is `$0` per month. The application must accept throttling or temporary unavailability rather than silently enable paid usage. There is no artificial platform-wide respondent-count cap; capacity protection is driven by relevant free-tier consumption and conservative estimates where provider-authoritative values cannot be obtained programmatically.
 
@@ -69,9 +69,9 @@ The product displays a clearly labelled estimate and allows Admin to enter a dat
 
 The production cluster uses single-region AWS `us-east-1`, close to Netlify Free’s Ohio execution. Pricing beyond the allowance is usage-based. Launch is blocked unless Basic can run without a payment method or the current account visibly enforces an exact `$0` limit. A historical resource-limit statement is not sufficient evidence.
 
-### Resend Free
+### Brevo Free
 
-Resend Free provides 3,000 transactional emails per month and 100 per day under the frozen limits. A company-controlled sending domain/subdomain and required DNS records must be verified. Resend carries employee invitations if enabled, password resets and infrastructure alerts only; respondent survey data is never sent to Resend.
+Brevo Free provides 300 account-wide email sends per day, resetting daily with no rollover. The production integration uses the HTTPS transactional-email API and a production-only API-key secret. A company-controlled domain is not required: an individually verified sender email is required, and Brevo may rewrite an unauthenticated or free-address sender to its compliant transactional sender domain. The approved tradeoffs are Brevo branding, reduced deliverability and brand alignment, possible provider queuing at quota exhaustion, shared sending reputation and no delivery SLA. Brevo carries employee invitations, password resets and infrastructure alerts only; respondent survey data is never sent to Brevo.
 
 ### `$0` launch gates and accepted availability
 
@@ -79,11 +79,11 @@ Production launch requires:
 
 1. Netlify remains on Free with paid upgrade/recharge disabled.
 2. Cockroach runs without a payment method or with a currently verified `$0` resource limit.
-3. Resend remains within Free limits.
+3. Brevo remains within its 300-emails-per-day Free limit.
 4. Native provider notices and application capacity protection are enabled.
 5. Load, quota, backup and restore release gates pass.
 
-Netlify may pause the whole application, Cockroach may throttle or reject work, and Resend may reject email at quota exhaustion. The product cannot promise UI, scheduled checks or application email after its hosting runtime has stopped. Provider-native notices and the `$0` account configuration are the final backstops.
+Netlify may pause the whole application, Cockroach may throttle or reject work, and Brevo may queue or reject email at quota exhaustion. The product cannot promise UI, scheduled checks or application email after its hosting runtime has stopped. Provider-native notices and the `$0` account configuration are the final backstops.
 
 ### Capacity planning model
 
@@ -130,7 +130,7 @@ PublicSurveySession, invitations, alerts and snapshots are small compared with e
                   └──────────────┬───────────┬──────┘
                                  │ TLS       │ HTTPS
                                  v           v
-                    CockroachDB Basic     Resend Free
+                    CockroachDB Basic     Brevo Free
                     - relational schema   - employee email only
                     - encrypted PII
                     - encrypted answers
@@ -452,7 +452,7 @@ All authenticated employees see:
 
 `Estimated Infrastructure Usage — N%`
 
-The headline is the maximum of estimated/manually reconciled Netlify credits, Cockroach RU and Cockroach storage. Resend daily/monthly usage appears in Admin detail but does not drive survey pausing. Colors: green below 50%, yellow 50–74.99%, orange 75–89.99%, strong orange 90–94.99%, red 95–98.99%, critical red at or above 99%.
+The headline is the maximum of estimated/manually reconciled Netlify credits, Cockroach RU and Cockroach storage. Brevo daily usage appears in Admin detail but does not drive survey pausing. Colors: green below 50%, yellow 50–74.99%, orange 75–89.99%, strong orange 90–94.99%, red 95–98.99%, critical red at or above 99%.
 
 Every reading displays its source and update time:
 
@@ -469,7 +469,7 @@ Stale readings older than six hours are labelled stale. Admin detail shows quota
 - `InfrastructureDeployment`: idempotent observed production deploy IDs for exact application-observed deployment-credit count.
 - `InfrastructureControlState`: cached primary percent/provider/source, evaluation time and protection state.
 
-Netlify credits are estimated from domain/request counts, sampled duration/bytes, static-asset multiplier and production deployment IDs. Cockroach RU/storage are conservatively modelled and calibrated to the provider console. Resend application send counters are exact because all sends use one adapter.
+Netlify credits are estimated from domain/request counts, sampled duration/bytes, static-asset multiplier and production deployment IDs. Cockroach RU/storage are conservatively modelled and calibrated to the provider console. Brevo application send counters count each recipient accepted by the adapter. The Brevo account must be dedicated to this platform or manually reconciled because its daily quota is account-wide.
 
 A Netlify Scheduled Function runs every three hours (about 240 calls per 30 days). At 1 GB and 0.25–1 second per invocation, its planning cost is approximately 0.17–0.67 credits per month. Dashboard loads read cached state and may request a refresh only when stale; public requests never call provider APIs.
 
@@ -477,7 +477,7 @@ A Netlify Scheduled Function runs every three hours (about 240 calls per 30 days
 
 All active Admins receive product email at 50%, 75%, 90%, 95% and 99% for relevant provider/quota periods. `InfrastructureAlertDelivery` has a unique provider/quota/period/threshold latch. Multiple crossings in one check may be consolidated into one email while preserving each latch. Successful alerts do not repeat within the same period; failed sends receive bounded retry.
 
-Provider-native 50/75/100 alerts remain enabled. If Resend itself is near its limit, its 99% product email may fail; earlier warning, cached UI and provider dashboard remain backstops. Resend exhaustion never drives respondent-capacity pausing.
+Provider-native alerts remain enabled where Brevo makes them available. If Brevo itself is near its limit, its 99% product email may be queued or fail; earlier warning, cached UI and provider dashboard remain backstops. Brevo exhaustion never drives respondent-capacity pausing.
 
 ## Q. PENDING_CAPACITY capacity protection
 
@@ -569,7 +569,7 @@ Repeat quarterly and after material backup-tool/provider changes. Record RPO/RTO
 | Spreadsheet injection             | Explicit text cells, dangerous-prefix apostrophe, no formula object                                    | Authorized download leaves application control                                                                      |
 | Usage estimate error              | Conservative calibration, three-hour checks, manual actuals, native alerts, `$0` account guard         | Estimate can differ from actual; sudden spikes can exhaust provider before protection                               |
 | Free-tier exhaustion              | 95% protection, native alerts, no paid upgrade                                                         | Netlify/Cockroach may pause/throttle; no paid SLA or guaranteed availability                                        |
-| Resend exhaustion                 | Early thresholds, cached UI, provider dashboard                                                        | Critical product email can fail when Resend is exhausted                                                            |
+| Brevo exhaustion                  | Early thresholds, cached UI, provider dashboard                                                        | Critical product email can be queued or fail when Brevo is exhausted                                                |
 | Key loss/rotation defect          | Versioned keys, two custodians, maintenance-only rotation, restore drill                               | Loss of all required keys makes ciphertext unrecoverable                                                            |
 | Data residency                    | US East Cockroach and Netlify Ohio selected for latency/free-tier compatibility                        | US processing is accepted subject to company privacy approval; architecture is not EU-only                          |
 

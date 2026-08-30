@@ -15,11 +15,12 @@ export function getInfrastructureService() {
       createInfrastructureMailAdapter({
         transport: environment.MAIL_TRANSPORT,
         localMailboxPath: environment.LOCAL_MAILBOX_PATH,
-        resendApiKey: environment.RESEND_API_KEY,
-        resendFromEmail: environment.RESEND_FROM_EMAIL,
+        brevoApiKey: environment.BREVO_API_KEY,
+        brevoFromEmail: environment.BREVO_FROM_EMAIL,
+        brevoFromName: environment.BREVO_FROM_NAME,
       }),
       undefined,
-      environment.MAIL_TRANSPORT === "resend",
+      environment.MAIL_TRANSPORT === "brevo",
     );
   }
   return service;

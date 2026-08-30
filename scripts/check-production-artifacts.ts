@@ -18,7 +18,7 @@ const forbiddenValues = [
   process.env.DATABASE_URL,
   process.env.MIGRATION_DATABASE_URL,
   process.env.RATE_LIMIT_HMAC_KEY,
-  process.env.RESEND_API_KEY,
+  process.env.BREVO_API_KEY,
   process.env.QSP_SMOKE_TOKEN,
   ...Object.entries(process.env)
     .filter(([name]) =>

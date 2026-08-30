@@ -61,35 +61,37 @@ describe("server environment", () => {
         ...validEnvironment,
         APP_ENV: "production",
         APP_ORIGIN: "https://survey.example.com",
-        MAIL_TRANSPORT: "resend",
-        RESEND_API_KEY: "synthetic-resend-placeholder",
-        RESEND_FROM_EMAIL: "Survey Platform <no-reply@synthetic.invalid>",
+        MAIL_TRANSPORT: "brevo",
+        BREVO_API_KEY: "synthetic-brevo-placeholder",
+        BREVO_FROM_EMAIL: "no-reply@synthetic.invalid",
+        BREVO_FROM_NAME: "Survey Platform",
         QSP_SMOKE_TOKEN: "synthetic-smoke-token-at-least-32-characters",
       }).MAIL_TRANSPORT,
-    ).toBe("resend");
+    ).toBe("brevo");
   });
 
-  it("accepts a bounded Resend display-name sender and rejects unsafe syntax", () => {
+  it("accepts a bounded Brevo sender name and rejects unsafe syntax", () => {
     const production = {
       ...validEnvironment,
       APP_ENV: "production" as const,
       APP_ORIGIN: "https://survey.example.com",
-      MAIL_TRANSPORT: "resend" as const,
-      RESEND_API_KEY: "synthetic-resend-placeholder",
+      MAIL_TRANSPORT: "brevo" as const,
+      BREVO_API_KEY: "synthetic-brevo-placeholder",
+      BREVO_FROM_EMAIL: "no-reply@synthetic.invalid",
       QSP_SMOKE_TOKEN: "synthetic-smoke-token-at-least-32-characters",
     };
     expect(
       parseServerEnvironment({
         ...production,
-        RESEND_FROM_EMAIL: "Survey Platform <no-reply@synthetic.invalid>",
-      }).RESEND_FROM_EMAIL,
-    ).toBe("Survey Platform <no-reply@synthetic.invalid>");
+        BREVO_FROM_NAME: "Survey Platform",
+      }).BREVO_FROM_NAME,
+    ).toBe("Survey Platform");
     expect(() =>
       parseServerEnvironment({
         ...production,
-        RESEND_FROM_EMAIL: "Unsafe\nSender <no-reply@synthetic.invalid>",
+        BREVO_FROM_NAME: "Unsafe\nSender",
       }),
-    ).toThrow("RESEND_FROM_EMAIL");
+    ).toThrow("BREVO_FROM_NAME");
   });
 
   it("requires a dedicated smoke token in preview and production", () => {
@@ -98,9 +100,10 @@ describe("server environment", () => {
         ...validEnvironment,
         APP_ENV: "preview",
         APP_ORIGIN: "https://preview.example.com",
-        MAIL_TRANSPORT: "resend",
-        RESEND_API_KEY: "synthetic-resend-placeholder",
-        RESEND_FROM_EMAIL: "no-reply@synthetic.invalid",
+        MAIL_TRANSPORT: "brevo",
+        BREVO_API_KEY: "synthetic-brevo-placeholder",
+        BREVO_FROM_EMAIL: "no-reply@synthetic.invalid",
+        BREVO_FROM_NAME: "Survey Platform",
       }),
     ).toThrow("QSP_SMOKE_TOKEN");
   });

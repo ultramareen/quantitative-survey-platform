@@ -22,10 +22,11 @@ export function getEmployeeAuthService(): EmployeeAuthService {
       createAuthMailAdapter({
         transport: environment.MAIL_TRANSPORT,
         localMailboxPath: environment.LOCAL_MAILBOX_PATH,
-        resendApiKey: environment.RESEND_API_KEY,
-        resendFromEmail: environment.RESEND_FROM_EMAIL,
-        onResendDelivered: () =>
-          getInfrastructureService().recordResendDelivery(),
+        brevoApiKey: environment.BREVO_API_KEY,
+        brevoFromEmail: environment.BREVO_FROM_EMAIL,
+        brevoFromName: environment.BREVO_FROM_NAME,
+        onBrevoDelivered: () =>
+          getInfrastructureService().recordBrevoDelivery(),
       }),
       environment.APP_ORIGIN,
     );

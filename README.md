@@ -11,8 +11,8 @@ Approved Phase 0–3 foundation for the quantitative survey platform.
 
 Development uses `MAIL_TRANSPORT=local-file`; password-reset messages are
 written to the ignored, local-only path in `LOCAL_MAILBOX_PATH`. Preview and
-production fail closed unless `MAIL_TRANSPORT=resend` and deployment-managed
-Resend credentials are present.
+production fail closed unless `MAIL_TRANSPORT=brevo` and deployment-managed
+Brevo credentials plus an individually verified sender are present.
 
 ## Initial Admin bootstrap
 

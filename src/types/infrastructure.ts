@@ -15,7 +15,7 @@ export type InfrastructureHeadline = {
 };
 
 export type InfrastructureQuotaDetail = {
-  provider: "NETLIFY" | "COCKROACH" | "RESEND";
+  provider: "NETLIFY" | "COCKROACH" | "BREVO";
   quota: string;
   used: number;
   limit: number;

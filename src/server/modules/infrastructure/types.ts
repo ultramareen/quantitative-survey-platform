@@ -40,7 +40,7 @@ export interface InfrastructureRepository {
   enforceCapacity(percent: number): Promise<number>;
   pauseAll(actorId: string): Promise<number>;
   switchActive(actorId: string, selectedPublicId: string): Promise<void>;
-  recordResendDelivery(at: Date): Promise<void>;
+  recordBrevoDelivery(at: Date): Promise<void>;
   observeDeployment(input: {
     deploymentId: string;
     production: boolean;

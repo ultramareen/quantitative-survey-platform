@@ -8,7 +8,7 @@ Reverified 29 August 2026 against official provider sources:
 
 - Netlify Free lists 300 monthly credits. Current credit accounting remains 15 per successful production deploy, 10 per GB-hour compute, 20 per GB bandwidth, and 2 per 10,000 web requests. Auto-recharge is unavailable on Free and must remain disabled if the account plan changes: <https://docs.netlify.com/manage/accounts-and-billing/billing/billing-for-credit-based-plans/how-credits-work/>.
 - CockroachDB Basic lists the first 50 million RUs and 10 GiB storage free each month and says no credit card is required. The actual organization must still visibly show no payment method or an exact `$0` limit: <https://www.cockroachlabs.com/pricing/>.
-- Resend Free lists 3,000 emails per month and 100 per day with no Free overage. Verify the company-controlled sending domain and native quota state in the actual account: <https://resend.com/pricing>.
+- Brevo Free lists 300 account-wide email sends per day, resetting daily without rollover, and includes transactional email with no credit card required. Verify the Free/no-payment state, transactional-account activation, individual sender verification, native quota state, compliant sender rewriting and Brevo branding in the actual account: <https://help.brevo.com/hc/en-us/articles/208580669-FAQs-What-are-the-limits-of-the-Free-plan>.
 
 Provider pages and the actual account console are authoritative. Any changed term or ambiguous `$0` control blocks launch; do not silently substitute a paid product.
 
@@ -20,9 +20,9 @@ Provider pages and the actual account console are authoritative. Any changed ter
 
 ## Production configuration
 
-- Use production-only `DATABASE_URL`, auth/session secret, versioned PII and phone-HMAC keys, rate-limit HMAC key, Resend key/sender, canonical HTTPS `APP_ORIGIN`, and a random `QSP_SMOKE_TOKEN` of at least 32 characters.
+- Use production-only `DATABASE_URL`, auth/session secret, versioned PII and phone-HMAC keys, rate-limit HMAC key, Brevo API key and individually verified sender email/name, canonical HTTPS `APP_ORIGIN`, and a random `QSP_SMOKE_TOKEN` of at least 32 characters.
 - Keep runtime, migration, and maintenance database credentials separate. Keep preview and production credentials/keys unrelated.
-- Confirm Netlify Free and no recharge/paid upgrade; Cockroach no payment method or a current exact `$0` limit; Resend Free; native notices; scheduled three-hour check; single-region Cockroach `aws-us-east-1`; and company-domain email delivery.
+- Confirm Netlify Free and no recharge/paid upgrade; Cockroach no payment method or a current exact `$0` limit; Brevo Free with no payment method, paid plan or add-on; native notices; scheduled three-hour check; single-region Cockroach `aws-us-east-1`; and real delivery from the individually verified sender to representative mailbox providers. Record rewritten sender identity, authentication results, inbox/spam placement, Brevo branding, quota behavior and absence of a delivery SLA. A company-controlled domain is not required.
 - `/api/health` is a detail-free liveness response. `/api/smoke` requires `Authorization: Bearer <QSP_SMOKE_TOKEN>`, checks the database, returns only `ok` or `unavailable`, and is never linked in UI.
 
 ## Controlled deployment sequence

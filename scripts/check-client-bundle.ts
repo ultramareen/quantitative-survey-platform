@@ -6,7 +6,7 @@ const forbiddenValues = [
   process.env.BETTER_AUTH_SECRET,
   process.env.DATABASE_URL,
   process.env.RATE_LIMIT_HMAC_KEY,
-  process.env.RESEND_API_KEY,
+  process.env.BREVO_API_KEY,
   process.env.QSP_BOOTSTRAP_PASSWORD,
   ...Object.entries(process.env)
     .filter(([name]) =>

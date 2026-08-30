@@ -752,7 +752,7 @@ Phase 12 can begin its estimation model after Phase 5, but automatic protection 
 
 - Conservative Netlify credit estimator from sampled requests, duration, bytes, static multiplier, and idempotent production deploy IDs.
 - Cockroach RU/storage estimation and Admin manual actual reconciliation.
-- Exact application Resend counters.
+- Per-recipient Brevo accepted-send counters against the account-wide 300/day Free limit.
 - Cached highest-risk headline reading.
 - Three-hour Netlify Scheduled Function.
 - Per-provider/quota/period threshold latches for 50/75/90/95/99.
@@ -783,7 +783,7 @@ Phase 12 can begin its estimation model after Phase 5, but automatic protection 
 - Estimator formula and calibration fixtures.
 - Source precedence: estimate versus dated manual actual.
 - Threshold crossing/deduplication/new-period tests.
-- Failed Resend alert retry.
+- Failed Brevo alert retry.
 - Concurrent activation at ≥95%.
 - 0/1/2+ ACTIVE transition cases.
 - Pause All/switch authorization and audit.
@@ -866,7 +866,7 @@ Phase 12 can begin its estimation model after Phase 5, but automatic protection 
 - Production configuration validation.
 - Health/smoke endpoints without sensitive details.
 - Final rate/body limits and security headers.
-- Scheduled function and Resend delivery verification.
+- Scheduled function and Brevo delivery verification, including sender rewriting where applied.
 
 **Frontend work:**
 
@@ -1109,7 +1109,7 @@ Data conventions:
 - Local single-node CockroachDB or approved isolated nonproduction Basic database.
 - Synthetic fixtures only.
 - Local/test secrets.
-- Resend disabled or routed to a safe test adapter.
+- Brevo disabled or routed to a safe test adapter.
 - Secure-cookie behavior configurable only for localhost.
 
 ### Automated test
@@ -1117,7 +1117,7 @@ Data conventions:
 - Fresh isolated database/schema per run.
 - Deterministic test keys.
 - Fake clock for 24-hour boundaries.
-- Stubbed Resend/provider readings.
+- Stubbed Brevo/provider readings.
 - No external production services.
 
 ### Preview
@@ -1125,7 +1125,7 @@ Data conventions:
 - Separate nonproduction database and credentials.
 - Unrelated PII, phone-HMAC, rate-limit, and auth secrets.
 - Synthetic data only.
-- Resend restricted to approved test recipients/domain behavior.
+- Brevo restricted to approved synthetic test recipients and verified-sender behavior.
 - No production provider manual readings or backup keys.
 
 ### Production
@@ -1137,20 +1137,20 @@ Required runtime configuration includes:
 - Versioned `PII_ENCRYPTION_KEY_Vn`.
 - Versioned `PHONE_LOOKUP_HMAC_KEY_Vn`.
 - `RATE_LIMIT_HMAC_KEY`.
-- Resend API key, verified sender, and Admin recipients.
+- Production-only Brevo API key, individually verified sender email/name, and Admin recipients.
 - Logging/redaction and infrastructure-estimator configuration.
 
 The independent `BACKUP_ENCRYPTION_KEY` belongs on the controlled backup machine and is not exposed to preview or ordinary application runtime. Production database credentials and keys never enter preview deployments.
 
 ## J. Deployment sequence
 
-1. Reverify Netlify Free, Cockroach Basic, and Resend Free terms.
+1. Reverify Netlify Free, Cockroach Basic, and Brevo Free terms, including the 300-emails-per-day account-wide limit and no payment method.
 2. Confirm Netlify paid upgrade/recharge is disabled.
 3. Confirm Cockroach has no payment method or a visibly enforced `$0` limit.
 4. Provision single-region production Cockroach cluster.
 5. Create least-privilege runtime and migration credentials.
 6. Configure production-only secrets in Netlify.
-7. Verify Resend company domain and Admin recipients.
+7. Verify the individual Brevo sender and Admin recipients; record any compliant sender rewriting, Brevo branding and representative mailbox delivery results. A company-controlled domain is not a release requirement.
 8. Take required pre-migration backup where applicable.
 9. Apply reviewed migrations using migration credentials.
 10. Run schema/constraint verification.

@@ -26,7 +26,7 @@ export class InfrastructureService {
     private readonly repository: InfrastructureRepository,
     private readonly mail: InfrastructureAlertMailAdapter,
     private readonly now: () => Date = () => new Date(),
-    private readonly countAlertAsResend = false,
+    private readonly countAlertAsBrevo = false,
   ) {}
 
   headline(actor: EmployeePrincipal | null) {
@@ -95,9 +95,9 @@ export class InfrastructureService {
           crossings,
           readings,
         });
-        if (this.countAlertAsResend)
+        if (this.countAlertAsBrevo)
           for (let index = 0; index < recipients.length; index += 1)
-            await this.repository.recordResendDelivery(this.now());
+            await this.repository.recordBrevoDelivery(this.now());
         await this.repository.markAlertsSent(crossings);
       } catch {
         await this.repository.markAlertsFailed(
@@ -111,8 +111,8 @@ export class InfrastructureService {
     return { readings: readings.length, crossings: crossings.length };
   }
 
-  recordResendDelivery(at = this.now()) {
-    return this.repository.recordResendDelivery(at);
+  recordBrevoDelivery(at = this.now()) {
+    return this.repository.recordBrevoDelivery(at);
   }
 
   observeProductionDeployment(deploymentId: string, observedAt = this.now()) {
@@ -130,8 +130,7 @@ function isApprovedQuota(provider: string, quota: string) {
     (provider === "NETLIFY" && quota === "CREDITS") ||
     (provider === "COCKROACH" &&
       (quota === "RU" || quota === "STORAGE_BYTES")) ||
-    (provider === "RESEND" &&
-      (quota === "DAILY_EMAILS" || quota === "MONTHLY_EMAILS"))
+    (provider === "BREVO" && quota === "DAILY_EMAILS")
   );
 }
 

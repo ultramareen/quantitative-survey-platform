@@ -11,7 +11,7 @@ import { getInfrastructureService } from "@/server/modules/infrastructure/runtim
 export const dynamic = "force-dynamic";
 const reconciliation = z
   .object({
-    provider: z.enum(["NETLIFY", "COCKROACH", "RESEND"]),
+    provider: z.enum(["NETLIFY", "COCKROACH", "BREVO"]),
     quota: z.string().min(1).max(128),
     period: z.string().min(1).max(64),
     used: z.number().nonnegative(),

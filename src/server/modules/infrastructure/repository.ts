@@ -24,7 +24,7 @@ import type {
 } from "./types";
 
 type UsageRow = {
-  provider: "NETLIFY" | "COCKROACH" | "RESEND";
+  provider: "NETLIFY" | "COCKROACH" | "BREVO";
   quota_key: string;
   period_key: string;
   used_units: string;
@@ -201,18 +201,11 @@ export class PgInfrastructureRepository implements InfrastructureRepository {
           QUOTA_LIMITS.COCKROACH_STORAGE_BYTES,
         ],
         [
-          "RESEND",
+          "BREVO",
           "DAILY_EMAILS",
           day,
-          bucketUnits(buckets.rows, "RESEND", "DAILY_EMAILS"),
-          QUOTA_LIMITS.RESEND_DAILY,
-        ],
-        [
-          "RESEND",
-          "MONTHLY_EMAILS",
-          month,
-          bucketUnits(buckets.rows, "RESEND", "MONTHLY_EMAILS"),
-          QUOTA_LIMITS.RESEND_MONTHLY,
+          bucketUnits(buckets.rows, "BREVO", "DAILY_EMAILS"),
+          QUOTA_LIMITS.BREVO_DAILY,
         ],
       ] as const;
       for (const [provider, quota, periodKey, used, limit] of estimates)
@@ -234,7 +227,7 @@ export class PgInfrastructureRepository implements InfrastructureRepository {
         );
       const effective = await latestEffectiveRows(client, month, day);
       const primary = effective
-        .filter((row) => row.provider !== "RESEND")
+        .filter((row) => row.provider !== "BREVO")
         .sort((a, b) => Number(b.usage_percent) - Number(a.usage_percent))[0];
       const effectivePercent = Number(primary?.usage_percent ?? 0);
       await client.query(
@@ -417,11 +410,8 @@ export class PgInfrastructureRepository implements InfrastructureRepository {
     });
   }
 
-  async recordResendDelivery(at: Date) {
-    await Promise.all([
-      this.incrementBucket("RESEND", "DAILY_EMAILS", periodDay(at), at),
-      this.incrementBucket("RESEND", "MONTHLY_EMAILS", periodMonth(at), at),
-    ]);
+  async recordBrevoDelivery(at: Date) {
+    await this.incrementBucket("BREVO", "DAILY_EMAILS", periodDay(at), at);
   }
 
   async observeDeployment(input: {
@@ -457,7 +447,7 @@ export class PgInfrastructureRepository implements InfrastructureRepository {
       updatedAt: row.collected_at.toISOString(),
       stale: now.getTime() - row.collected_at.getTime() > STALE_AFTER_MS,
       providerConsoleUrl: PROVIDER_CONSOLE_URLS[row.provider],
-      drivesProtection: row.provider !== "RESEND",
+      drivesProtection: row.provider !== "BREVO",
       collectedAt: row.collected_at,
     }));
   }

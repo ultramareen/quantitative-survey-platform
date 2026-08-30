@@ -25,7 +25,7 @@ const at = new Date("2026-08-29T12:00:00.000Z");
 
 function reading(
   percentValue: number,
-  provider: "NETLIFY" | "COCKROACH" | "RESEND" = "NETLIFY",
+  provider: "NETLIFY" | "COCKROACH" | "BREVO" = "NETLIFY",
 ): UsageReading {
   return {
     provider,
@@ -39,7 +39,7 @@ function reading(
     updatedAt: at.toISOString(),
     stale: false,
     providerConsoleUrl: "https://example.invalid",
-    drivesProtection: provider !== "RESEND",
+    drivesProtection: provider !== "BREVO",
     collectedAt: at,
   };
 }
@@ -57,7 +57,7 @@ function repository(overrides: Partial<InfrastructureRepository> = {}) {
     enforceCapacity: vi.fn(),
     pauseAll: vi.fn().mockResolvedValue(0),
     switchActive: vi.fn(),
-    recordResendDelivery: vi.fn(),
+    recordBrevoDelivery: vi.fn(),
     observeDeployment: vi.fn(),
     ...overrides,
   } as InfrastructureRepository;
@@ -184,9 +184,9 @@ describe("Phase 12 infrastructure service authorization and protection", () => {
       expect(repo.enforceCapacity).toHaveBeenCalledWith(value);
     },
   );
-  it("does not let Resend exhaustion drive capacity pausing", async () => {
+  it("does not let Brevo exhaustion drive capacity pausing", async () => {
     const repo = repository({
-      evaluate: vi.fn().mockResolvedValue([reading(99, "RESEND")]),
+      evaluate: vi.fn().mockResolvedValue([reading(99, "BREVO")]),
     });
     await new InfrastructureService(
       repo,
