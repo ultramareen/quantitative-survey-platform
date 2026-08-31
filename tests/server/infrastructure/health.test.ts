@@ -15,7 +15,7 @@ describe("production health and smoke checks", () => {
 
   it("returns only a boolean readiness outcome for database success or failure", async () => {
     const readyPool = {
-      query: vi.fn().mockResolvedValue({ rows: [{ ready: 1 }] }),
+      query: vi.fn().mockResolvedValue({ rows: [{ ready: true }] }),
     };
     await expect(
       new ProductionHealthService(readyPool as never).ready(),

@@ -8,8 +8,8 @@ export class ProductionHealthService {
 
   async ready(): Promise<boolean> {
     try {
-      const result = await this.pool.query("SELECT 1 AS ready");
-      return result.rows[0]?.ready === 1;
+      const result = await this.pool.query("SELECT TRUE AS ready");
+      return result.rows[0]?.ready === true;
     } catch {
       return false;
     }
