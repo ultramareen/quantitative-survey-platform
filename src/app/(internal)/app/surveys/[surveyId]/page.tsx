@@ -2,8 +2,11 @@ import { notFound } from "next/navigation";
 import { SurveyActions } from "@/components/surveys/survey-actions";
 import { SurveyBuilder } from "@/components/surveys/survey-builder";
 import { SurveyResults } from "@/components/results/survey-results";
+import { PublicSurveyUrl } from "@/components/surveys/public-survey-url";
+import { getServerEnvironment } from "@/server/config/env";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import { getSurveyService } from "@/server/modules/surveys/runtime";
+import { buildPublicSurveyUrl } from "@/server/modules/surveys/public-url";
 import { getResultsService } from "@/server/modules/results/runtime";
 
 export default async function SurveyPage({
@@ -28,6 +31,10 @@ export default async function SurveyPage({
     survey.status !== "DRAFT"
       ? await getResultsService().history(employee, survey.id)
       : [];
+  const publicUrl = buildPublicSurveyUrl(
+    survey.publicId,
+    getServerEnvironment().APP_ORIGIN,
+  );
   return (
     <section>
       <p className="text-sm font-semibold tracking-wide text-blue-700 uppercase">
@@ -38,10 +45,10 @@ export default async function SurveyPage({
         Author: {survey.ownerName} · {survey.questionCount} questions · Version{" "}
         {survey.stateVersion}
       </p>
-      <p className="mt-2 text-sm text-slate-600">
-        Public URL: <code>/survey/{survey.publicId}</code>
-        {survey.status === "DRAFT" ? " (closed until activation)" : ""}
-      </p>
+      <PublicSurveyUrl url={publicUrl} />
+      {survey.status === "DRAFT" ? (
+        <p className="mt-1 text-xs text-slate-500">Closed until activation.</p>
+      ) : null}
       {survey.status !== "DRAFT" ? (
         <p className="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">
           This questionnaire is immutable because it has been activated.
@@ -52,7 +59,17 @@ export default async function SurveyPage({
         </p>
       ) : null}
       <SurveyActions survey={survey} employee={employee} />
-      <SurveyBuilder survey={survey} readOnly={!canEdit} />
+      <SurveyBuilder
+        survey={survey}
+        readOnly={!canEdit}
+        finalActions={
+          <SurveyActions
+            survey={survey}
+            employee={employee}
+            placement="footer"
+          />
+        }
+      />
       {survey.status !== "DRAFT" ? (
         <SurveyResults
           surveyId={survey.id}

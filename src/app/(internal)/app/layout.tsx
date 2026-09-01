@@ -9,7 +9,7 @@ export default async function AppLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   const employee = await getCurrentEmployee();
-  if (!employee) redirect("/sign-in?reason=session-required");
+  if (!employee) redirect("/sign-in");
   const usage = await getInfrastructureService().headline(employee);
   return (
     <InternalShell employee={employee}>
