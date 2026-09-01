@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import type {
   QuestionType,
   SurveyDetail,
@@ -18,9 +18,11 @@ const blankQuestion = (): SurveyDraftInput["questions"][number] => ({
 export function SurveyBuilder({
   survey,
   readOnly = false,
+  finalActions,
 }: {
   survey?: SurveyDetail;
   readOnly?: boolean;
+  finalActions?: ReactNode;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(survey?.title ?? "");
@@ -54,6 +56,23 @@ export function SurveyBuilder({
       [copy[index], copy[target]] = [copy[target]!, copy[index]!];
       return copy;
     });
+  }
+  function moveOption(
+    questionIndex: number,
+    optionIndex: number,
+    target: number,
+  ) {
+    if (target < 0 || target >= questions[questionIndex]!.options.length)
+      return;
+    setQuestions((value) =>
+      value.map((question, index) => {
+        if (index !== questionIndex) return question;
+        const options = [...question.options];
+        const [option] = options.splice(optionIndex, 1);
+        options.splice(target, 0, option!);
+        return { ...question, options };
+      }),
+    );
   }
   async function save(event: FormEvent) {
     event.preventDefault();
@@ -114,14 +133,6 @@ export function SurveyBuilder({
             {questions.length}/50
           </span>
         </h2>
-        <button
-          type="button"
-          disabled={questions.length >= 50}
-          onClick={() => setQuestions((v) => [...v, blankQuestion()])}
-          className="rounded-lg border px-3 py-2"
-        >
-          Add question
-        </button>
       </div>
       {questions.length === 0 ? (
         <p className="rounded-xl border border-dashed p-6 text-slate-600">
@@ -186,20 +197,49 @@ export function SurveyBuilder({
               <div>
                 <div className="mb-2 flex justify-between">
                   <strong>Answer options ({question.options.length}/11)</strong>
-                  <button
-                    type="button"
-                    disabled={question.options.length >= 11}
-                    onClick={() =>
-                      changeQuestion(index, {
-                        options: [...question.options, ""],
-                      })
-                    }
-                  >
-                    Add option
-                  </button>
                 </div>
                 {question.options.map((option, optionIndex) => (
-                  <div className="mb-2 flex gap-2" key={optionIndex}>
+                  <div
+                    className="mb-2 flex items-center gap-2"
+                    data-option-index={optionIndex}
+                    key={optionIndex}
+                    onDragOver={(event) => {
+                      if (
+                        event.dataTransfer.types.includes(
+                          "application/x-survey-option",
+                        )
+                      )
+                        event.preventDefault();
+                    }}
+                    onDrop={(event) => {
+                      event.preventDefault();
+                      const [sourceQuestion, sourceOption] = event.dataTransfer
+                        .getData("application/x-survey-option")
+                        .split(":")
+                        .map(Number);
+                      if (
+                        sourceQuestion !== index ||
+                        !Number.isInteger(sourceOption)
+                      )
+                        return;
+                      moveOption(index, sourceOption!, optionIndex);
+                    }}
+                  >
+                    <button
+                      aria-label={`Drag question ${index + 1} option ${optionIndex + 1}`}
+                      className="cursor-grab rounded border px-2 py-2 text-slate-500 active:cursor-grabbing"
+                      draggable
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData(
+                          "application/x-survey-option",
+                          `${index}:${optionIndex}`,
+                        );
+                      }}
+                      type="button"
+                    >
+                      <span aria-hidden="true">⋮⋮</span>
+                    </button>
                     <input
                       aria-label={`Question ${index + 1} option ${optionIndex + 1}`}
                       className="min-w-0 flex-1 rounded-lg border px-3 py-2"
@@ -214,6 +254,26 @@ export function SurveyBuilder({
                         })
                       }
                     />
+                    <button
+                      aria-label={`Move question ${index + 1} option ${optionIndex + 1} up`}
+                      disabled={optionIndex === 0}
+                      onClick={() =>
+                        moveOption(index, optionIndex, optionIndex - 1)
+                      }
+                      type="button"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      aria-label={`Move question ${index + 1} option ${optionIndex + 1} down`}
+                      disabled={optionIndex === question.options.length - 1}
+                      onClick={() =>
+                        moveOption(index, optionIndex, optionIndex + 1)
+                      }
+                      type="button"
+                    >
+                      ↓
+                    </button>
                     <button
                       type="button"
                       onClick={() =>
@@ -236,6 +296,20 @@ export function SurveyBuilder({
               </p>
             )}
             <div className="flex flex-wrap gap-3 border-t pt-3">
+              {question.type !== "FREE_TEXT" ? (
+                <button
+                  type="button"
+                  disabled={question.options.length >= 11}
+                  onClick={() =>
+                    changeQuestion(index, {
+                      options: [...question.options, ""],
+                    })
+                  }
+                  className="rounded-md bg-emerald-700 px-3 py-1.5 text-white disabled:opacity-50"
+                >
+                  Add option
+                </button>
+              ) : null}
               <button
                 type="button"
                 disabled={index === 0}
@@ -263,17 +337,34 @@ export function SurveyBuilder({
           </div>
         </fieldset>
       ))}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={questions.length >= 50}
+          onClick={() => setQuestions((v) => [...v, blankQuestion()])}
+          className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium disabled:opacity-50"
+        >
+          Add question
+        </button>
+      </div>
       {message ? (
         <p role="status" className="rounded-lg bg-slate-100 p-3">
           {message}
         </p>
       ) : null}
-      <button
-        disabled={busy}
-        className="rounded-lg bg-blue-700 px-5 py-3 font-medium text-white disabled:opacity-50"
+      <div
+        aria-label="Survey final actions"
+        className="flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6"
+        role="group"
       >
-        {busy ? "Saving…" : "Save Draft"}
-      </button>
+        <button
+          disabled={busy}
+          className="rounded-lg bg-slate-200 px-5 py-3 font-medium text-slate-900 disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Save Draft"}
+        </button>
+        {finalActions}
+      </div>
     </form>
   );
 }

@@ -1,4 +1,5 @@
 import { SignInForm } from "@/components/auth/sign-in-form";
+import { getSignInNotice } from "@/components/auth/sign-in-notice";
 
 export default async function SignInPage({
   searchParams,
@@ -6,12 +7,7 @@ export default async function SignInPage({
   searchParams: Promise<{ reason?: string }>;
 }) {
   const { reason } = await searchParams;
-  const notice =
-    reason === "session-required"
-      ? "Your session is missing or expired. Sign in to continue."
-      : reason === "password-reset"
-        ? "Password updated. Sign in with your new password."
-        : undefined;
+  const notice = getSignInNotice(reason);
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md items-center px-4 py-12">
       <section className="w-full rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
