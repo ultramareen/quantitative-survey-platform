@@ -114,6 +114,20 @@ export class EmployeeManagementService {
       now: this.clock(),
     });
   }
+  async changeInvitationRole(
+    actor: EmployeePrincipal | null,
+    invitationId: string,
+    role: EmployeeRole,
+  ) {
+    const admin = requireRole(actor, ["ADMIN"]);
+    validRole(role);
+    await this.repository.changeInvitationRole({
+      actorId: admin.id,
+      invitationId,
+      role,
+      now: this.clock(),
+    });
+  }
   async changeRole(
     actor: EmployeePrincipal | null,
     userId: string,

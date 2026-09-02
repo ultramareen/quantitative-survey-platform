@@ -17,7 +17,7 @@ export default async function AcceptInvitationPage({
     preview = null;
   }
   const message = !preview
-    ? "This invitation is invalid or unavailable."
+    ? "This invitation has been cancelled, expired, or is no longer available."
     : preview.state === "EXPIRED"
       ? "This invitation has expired. Ask an administrator to resend it."
       : preview.state !== "VALID"

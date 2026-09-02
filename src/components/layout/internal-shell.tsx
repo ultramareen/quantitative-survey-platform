@@ -1,4 +1,7 @@
+"use client";
+
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import { LogoutButton } from "@/components/auth/logout-button";
 import type { EmployeePrincipal } from "@/types/employee";
@@ -7,6 +10,16 @@ export function InternalShell({
   children,
   employee,
 }: Readonly<{ children: React.ReactNode; employee: EmployeePrincipal }>) {
+  const pathname = usePathname();
+  const linkClass = (href: string) => {
+    const active =
+      href === "/app"
+        ? pathname === href
+        : pathname === href || pathname.startsWith(`${href}/`);
+    return `rounded-md px-3 py-2 text-sm ${
+      active ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-900"
+    }`;
+  };
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
       <a
@@ -24,20 +37,27 @@ export function InternalShell({
           className="mt-5 flex flex-wrap gap-2 lg:flex-col"
         >
           <Link
-            className="rounded-md bg-slate-800 px-3 py-2 text-sm"
+            aria-current={pathname === "/app" ? "page" : undefined}
+            className={linkClass("/app")}
             href="/app"
           >
             Workspace
           </Link>
           <Link
-            className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-900"
+            aria-current={
+              pathname.startsWith("/app/surveys") ? "page" : undefined
+            }
+            className={linkClass("/app/surveys")}
             href="/app/surveys"
           >
             Surveys
           </Link>
           {employee.role === "RESEARCHER" || employee.role === "ADMIN" ? (
             <Link
-              className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-900"
+              aria-current={
+                pathname.startsWith("/app/respondents") ? "page" : undefined
+              }
+              className={linkClass("/app/respondents")}
               href="/app/respondents"
             >
               Respondents
@@ -45,7 +65,10 @@ export function InternalShell({
           ) : null}
           {employee.role === "ADMIN" ? (
             <Link
-              className="rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-900"
+              aria-current={
+                pathname.startsWith("/app/admin") ? "page" : undefined
+              }
+              className={linkClass("/app/admin")}
               href="/app/admin"
             >
               Admin

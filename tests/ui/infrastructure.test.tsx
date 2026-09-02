@@ -26,7 +26,7 @@ describe("Phase 12 infrastructure UI", () => {
       "99",
     );
   });
-  it("shows critical messaging, quota source, provider link, and Admin controls without internal ids", () => {
+  it("explains provider readings and keeps capacity selection without the survey bulk action", () => {
     render(
       <InfrastructureAdminControls
         view={{
@@ -70,8 +70,29 @@ describe("Phase 12 infrastructure UI", () => {
       "https://app.netlify.com/teams",
     );
     expect(
-      screen.getByRole("button", { name: "Pause all active surveys" }),
+      screen.getByText(/free-tier limits that keep this service/),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Pause all active surveys" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Provider quota")).toHaveValue(
+      "NETLIFY:CREDITS",
+    );
     expect(document.body.textContent).not.toContain("00000000-");
+  });
+  it("explains an empty quota table instead of rendering blank controls", () => {
+    render(
+      <InfrastructureAdminControls
+        view={{
+          headline: { ...headline, percent: 0 },
+          quotas: [],
+          activeSurveys: [],
+          pendingSurveys: [],
+        }}
+      />,
+    );
+    expect(
+      screen.getByText(/No quota readings are available yet/),
+    ).toBeInTheDocument();
   });
 });

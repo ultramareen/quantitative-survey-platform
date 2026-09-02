@@ -32,13 +32,16 @@ describe("Phase 12 infrastructure persistence and capacity invariants", () => {
   });
   afterAll(async () => pool.end());
 
-  async function survey(status: "ACTIVE" | "PENDING_CAPACITY", title: string) {
+  async function survey(
+    status: "DRAFT" | "ACTIVE" | "PENDING_CAPACITY" | "COMPLETED",
+    title: string,
+  ) {
     const id = randomUUID();
     const publicId = `phase12-${randomUUID()}`;
     await pool.query(
       `INSERT INTO surveys
-        (id,public_id,owner_id,title,status,pause_reason,state_version,question_count,launched_at,paused_at,state_changed_at,created_at,updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,1,1,now(),CASE WHEN $5='PENDING_CAPACITY' THEN now() ELSE NULL END,now(),now(),now())`,
+        (id,public_id,owner_id,title,status,pause_reason,state_version,question_count,launched_at,paused_at,completed_at,state_changed_at,created_at,updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,1,1,now(),CASE WHEN $5='PENDING_CAPACITY' THEN now() ELSE NULL END,CASE WHEN $5='COMPLETED' THEN now() ELSE NULL END,now(),now(),now())`,
       [
         id,
         publicId,
@@ -96,9 +99,30 @@ describe("Phase 12 infrastructure persistence and capacity invariants", () => {
 
   it("performs Admin Pause All and a high-usage atomic switch with safe audits", async () => {
     await pool.query("DELETE FROM surveys WHERE owner_id=$1", [ownerId]);
-    await survey("ACTIVE", "Active before pause");
+    const paused = await survey("ACTIVE", "Active before pause");
     const selected = await survey("PENDING_CAPACITY", "Selected pending");
+    const draft = await survey("DRAFT", "Draft unaffected");
+    const completed = await survey("COMPLETED", "Completed unaffected");
     expect(await repository.pauseAll(adminId)).toBe(1);
+    const unchanged = await pool.query(
+      "SELECT id,status,pause_reason FROM surveys WHERE id=ANY($1::UUID[]) ORDER BY id",
+      [[paused.id, selected.id, draft.id, completed.id]],
+    );
+    expect(unchanged.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: paused.id,
+          status: "PENDING_CAPACITY",
+          pause_reason: "MANUAL",
+        }),
+        expect.objectContaining({
+          id: selected.id,
+          status: "PENDING_CAPACITY",
+        }),
+        expect.objectContaining({ id: draft.id, status: "DRAFT" }),
+        expect.objectContaining({ id: completed.id, status: "COMPLETED" }),
+      ]),
+    );
     await pool.query(
       "UPDATE infrastructure_control_state SET effective_percent=99 WHERE singleton_key='global'",
     );

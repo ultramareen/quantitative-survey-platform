@@ -286,6 +286,41 @@ describe("Phase 4 employee management persistence", () => {
     expect(auditText).not.toContain(oldToken);
     expect(auditText).not.toContain(newToken);
   });
+  it("changes a pending invitation role before acceptance and audits the correction", async () => {
+    const created = await management.createInvitation(admin, {
+      email: "corrected-role@synthetic.invalid",
+      role: "PRODUCT_MANAGER",
+    });
+    const token = new URL(mail.messages.at(-1)!.invitationUrl).searchParams.get(
+      "token",
+    )!;
+    await management.changeInvitationRole(
+      admin,
+      created.invitationId,
+      "RESEARCHER",
+    );
+    const accepted = await management.accept({
+      token,
+      displayName: "Corrected Role",
+      password: employeePassword,
+      passwordConfirmation: employeePassword,
+    });
+    expect(
+      (
+        await pool.query("SELECT role FROM users WHERE id=$1", [
+          accepted.userId,
+        ])
+      ).rows[0].role,
+    ).toBe("RESEARCHER");
+    expect(
+      (
+        await pool.query(
+          "SELECT count(*)::INT4 count FROM audit_events WHERE target_id=$1 AND action='EMPLOYEE_INVITATION_ROLE_CHANGED'",
+          [created.invitationId],
+        )
+      ).rows[0].count,
+    ).toBe(1);
+  });
 
   it("rejects expired and disabled invitations and makes resend links single-use", async () => {
     await management.createInvitation(admin, {

@@ -37,6 +37,7 @@ export type PublicAttemptState = {
   conflict?: true;
   editable: boolean;
   recorded: boolean;
+  paused?: boolean;
 };
 export type PublicSubmitResult =
   | { submitted: true; analyticallyComplete: boolean }

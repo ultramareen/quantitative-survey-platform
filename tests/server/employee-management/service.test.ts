@@ -33,6 +33,9 @@ class Mail implements InvitationMailAdapter {
 class Repo implements EmployeeManagementRepository {
   created?: Parameters<EmployeeManagementRepository["createInvitation"]>[0];
   resent?: Parameters<EmployeeManagementRepository["resendInvitation"]>[0];
+  invitationRole?: Parameters<
+    EmployeeManagementRepository["changeInvitationRole"]
+  >[0];
   async list() {
     return [];
   }
@@ -55,6 +58,11 @@ class Repo implements EmployeeManagementRepository {
     return "employee@example.com";
   }
   async disableInvitation() {}
+  async changeInvitationRole(
+    input: Parameters<EmployeeManagementRepository["changeInvitationRole"]>[0],
+  ) {
+    this.invitationRole = input;
+  }
   async changeRole() {}
   async disableEmployee() {}
   async reenableEmployee() {}
@@ -119,6 +127,19 @@ describe("employee management service", () => {
     )!;
     expect(repo.resent?.tokenHash.equals(hashSecureToken(token))).toBe(true);
     expect(JSON.stringify(result)).not.toContain(token);
+  });
+  it("allows only Admin to change a pending invitation role", async () => {
+    const { repo, service, now } = fixture();
+    await service.changeInvitationRole(admin, "invitation", "RESEARCHER");
+    expect(repo.invitationRole).toEqual({
+      actorId: "admin",
+      invitationId: "invitation",
+      role: "RESEARCHER",
+      now,
+    });
+    await expect(
+      service.changeInvitationRole(pm, "invitation", "ADMIN"),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
   it("rejects browser-supplied email or role during acceptance", async () => {
     const { service } = fixture();
