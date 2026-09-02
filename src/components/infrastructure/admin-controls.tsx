@@ -34,12 +34,13 @@ export function InfrastructureAdminControls({
     setBusy(true);
     setMessage("");
     try {
+      const [provider, quota] = String(form.get("quotaSelection")).split(":");
       const response = await fetch("/api/admin/infrastructure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider: form.get("provider"),
-          quota: form.get("quota"),
+          provider,
+          quota,
           period: form.get("period"),
           used: Number(form.get("used")),
           limit: Number(form.get("limit")),
@@ -83,6 +84,13 @@ export function InfrastructureAdminControls({
         <h2 id="quota-heading" className="text-xl font-semibold">
           Provider quota detail
         </h2>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+          Operational view of the free-tier limits that keep this service at $0.
+          Application estimates update automatically; dated readings from
+          provider dashboards can be entered below when no supported provider
+          API is available. Netlify and Cockroach readings drive survey
+          protection. Brevo is monitored for email capacity only.
+        </p>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
@@ -102,6 +110,15 @@ export function InfrastructureAdminControls({
               </tr>
             </thead>
             <tbody>
+              {view.quotas.length === 0 ? (
+                <tr>
+                  <td className="p-4 text-slate-500" colSpan={6}>
+                    No quota readings are available yet. The scheduled usage
+                    check will populate estimates, or an Admin can record a
+                    dated provider-dashboard reading below.
+                  </td>
+                </tr>
+              ) : null}
               {view.quotas.map((quota) => (
                 <tr key={`${quota.provider}-${quota.quota}-${quota.period}`}>
                   <td className="border-b p-2">
@@ -152,25 +169,26 @@ export function InfrastructureAdminControls({
         >
           Manual provider-dashboard reconciliation
         </h2>
-        <label>
-          Provider
+        <p className="text-sm text-slate-600 sm:col-span-2">
+          Choose the exact provider quota shown in its dashboard. Manual
+          readings override estimates only for the matching dated period.
+        </p>
+        <label className="sm:col-span-2">
+          Provider quota
           <select
             className="mt-1 block w-full rounded border p-2"
-            name="provider"
+            name="quotaSelection"
             required
           >
-            <option>NETLIFY</option>
-            <option>COCKROACH</option>
-            <option>BREVO</option>
+            <option value="NETLIFY:CREDITS">Netlify — monthly credits</option>
+            <option value="COCKROACH:RU">
+              CockroachDB — monthly request units
+            </option>
+            <option value="COCKROACH:STORAGE_BYTES">
+              CockroachDB — storage bytes
+            </option>
+            <option value="BREVO:DAILY_EMAILS">Brevo — daily emails</option>
           </select>
-        </label>
-        <label>
-          Quota key
-          <input
-            className="mt-1 block w-full rounded border p-2"
-            name="quota"
-            required
-          />
         </label>
         <label>
           Quota period
@@ -226,13 +244,9 @@ export function InfrastructureAdminControls({
         <h2 id="controls-heading" className="text-xl font-semibold">
           Capacity controls
         </h2>
-        <button
-          disabled={busy}
-          onClick={() => action({ action: "pause-all" })}
-          className="mt-3 rounded bg-red-700 px-4 py-2 font-medium text-white"
-        >
-          Pause all active surveys
-        </button>
+        <p className="mt-2 text-sm text-slate-600">
+          At 95% usage or above, select which paused survey may remain active.
+        </p>
         <div className="mt-5 grid gap-2">
           {view.pendingSurveys.map((survey) => (
             <button

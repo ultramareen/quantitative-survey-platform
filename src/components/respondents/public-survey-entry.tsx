@@ -320,6 +320,13 @@ function Questionnaire({ publicId }: { publicId: string }) {
   }
   if (!attempt)
     return <Unavailable title="Opening your response" body={saveState} />;
+  if (attempt.paused)
+    return (
+      <Unavailable
+        title={attempt.title}
+        body="This survey is temporarily paused and is not accepting response changes."
+      />
+    );
   if (attempt.recorded)
     return (
       <Unavailable

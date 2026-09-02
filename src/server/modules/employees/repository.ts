@@ -52,6 +52,12 @@ export interface EmployeeManagementRepository {
     invitationId: string;
     now: Date;
   }): Promise<void>;
+  changeInvitationRole(input: {
+    actorId: string;
+    invitationId: string;
+    role: EmployeeRole;
+    now: Date;
+  }): Promise<void>;
   changeRole(input: {
     actorId: string;
     userId: string;
@@ -345,6 +351,32 @@ export class PgEmployeeManagementRepository implements EmployeeManagementReposit
         "EmployeeInvitation",
         input.invitationId,
         { role: invitation.role },
+        input.now,
+      );
+    });
+  }
+
+  async changeInvitationRole(input: {
+    actorId: string;
+    invitationId: string;
+    role: EmployeeRole;
+    now: Date;
+  }) {
+    await this.transaction(async (client) => {
+      const invitation = await this.lockInvitation(client, input.invitationId);
+      if (invitation.status !== "INVITED")
+        throw conflict("Only a pending invitation can have its role changed.");
+      await client.query(
+        "UPDATE employee_invitations SET assigned_role = $2, updated_at = $3 WHERE id = $1",
+        [input.invitationId, input.role, input.now],
+      );
+      await audit(
+        client,
+        input.actorId,
+        "EMPLOYEE_INVITATION_ROLE_CHANGED",
+        "EmployeeInvitation",
+        input.invitationId,
+        { oldRole: invitation.role, newRole: input.role },
         input.now,
       );
     });

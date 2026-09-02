@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { SurveyManagementActions } from "@/components/surveys/pause-all-surveys";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import { getSurveyService } from "@/server/modules/surveys/runtime";
 import type { SurveySummary } from "@/types/survey";
 
 export default async function SurveysPage() {
-  const surveys = await getSurveyService().list(await getCurrentEmployee());
+  const employee = await getCurrentEmployee();
+  const surveys = await getSurveyService().list(employee);
   const active = surveys.filter(
     (s) => s.status === "ACTIVE" || s.status === "PENDING_CAPACITY",
   );
@@ -30,6 +32,7 @@ export default async function SurveysPage() {
           Create New Survey
         </Link>
       </div>
+      {employee ? <SurveyManagementActions role={employee.role} /> : null}
       <SurveySection
         title="Draft Surveys"
         empty="No Draft surveys."

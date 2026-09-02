@@ -465,7 +465,7 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
     expect(stored.aggregate).not.toContain("Grouped Secret");
     expect(stored.encrypted).not.toContain("Grouped Secret");
   });
-  it("blocks stale identity after ACTIVE changes to PENDING and still records PENDING Opens", async () => {
+  it("blocks response changes after an Admin-style manual pause and still records PENDING Opens", async () => {
     let survey = await surveys.view(owner, surveyId);
     await surveys.transition(
       owner,
@@ -480,21 +480,22 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
     );
     expect(pending.availability).toBe("PENDING");
     const existing = await attempts.load(publicId, replacementToken);
-    expect(existing.editable).toBe(true);
-    const continued = await attempts.mutate(publicId, replacementToken, {
-      questionPosition: 3,
-      value: "Continued while pending",
-      generation: 2,
-      baseRevision: 3,
-      mutationId: "70000000-0000-4000-8000-000000000010",
-    });
-    expect(continued.revision).toBe(4);
-    expect(
-      await attempts.submit(publicId, replacementToken, {
+    expect(existing).toMatchObject({ editable: false, paused: true });
+    await expect(
+      attempts.mutate(publicId, replacementToken, {
+        questionPosition: 3,
+        value: "Blocked while manually paused",
         generation: 2,
-        baseRevision: 4,
+        baseRevision: 3,
+        mutationId: "70000000-0000-4000-8000-000000000010",
       }),
-    ).toEqual({ submitted: true, analyticallyComplete: true });
+    ).rejects.toMatchObject({ code: "ATTEMPT_CONFLICT" });
+    await expect(
+      attempts.submit(publicId, replacementToken, {
+        generation: 2,
+        baseRevision: 3,
+      }),
+    ).rejects.toMatchObject({ code: "ATTEMPT_CONFLICT" });
     await expect(
       respondents.identify(
         publicId,

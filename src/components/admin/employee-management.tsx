@@ -111,31 +111,36 @@ export function EmployeeManagement({
                   <span className="text-slate-600">{row.email}</span>
                 </td>
                 <td className="p-3">
-                  {row.userId ? (
-                    <select
-                      aria-label={`Role for ${row.email}`}
-                      defaultValue={row.role}
-                      disabled={busy}
-                      onChange={(e) =>
-                        mutate(
-                          `/api/admin/employees/${row.userId}`,
-                          "PATCH",
-                          { action: "change-role", role: e.target.value },
-                          "Role changed and sessions revoked.",
-                        )
+                  {row.userId || row.status === "INVITED" ? (
+                    <RoleEditor
+                      busy={busy}
+                      email={row.email}
+                      role={row.role}
+                      save={(role) =>
+                        row.userId
+                          ? mutate(
+                              `/api/admin/employees/${row.userId}`,
+                              "PATCH",
+                              { action: "change-role", role },
+                              "Role changed and sessions revoked.",
+                            )
+                          : mutate(
+                              `/api/admin/invitations/${row.invitationId}`,
+                              "POST",
+                              { action: "change-role", role },
+                              "Invitation role changed.",
+                            )
                       }
-                    >
-                      {roles.map((role) => (
-                        <option key={role}>{role}</option>
-                      ))}
-                    </select>
+                    />
                   ) : (
                     row.role.replaceAll("_", " ")
                   )}
                 </td>
                 <td className="p-3">
                   {row.disabledAt
-                    ? "Disabled"
+                    ? row.userId
+                      ? "Deactivated"
+                      : "Cancelled invitation"
                     : row.status === "INVITED" &&
                         row.tokenExpiresAt &&
                         new Date(row.tokenExpiresAt) <= new Date()
@@ -175,32 +180,42 @@ export function EmployeeManagement({
                         </button>
                         <button
                           disabled={busy}
-                          onClick={() =>
-                            mutate(
-                              `/api/admin/invitations/${row.invitationId}`,
-                              "POST",
-                              { action: "disable" },
-                              "Invitation disabled.",
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Cancel the invitation for ${row.email}? The emailed link will stop working immediately.`,
+                              )
                             )
-                          }
+                              void mutate(
+                                `/api/admin/invitations/${row.invitationId}`,
+                                "POST",
+                                { action: "cancel" },
+                                "Invitation cancelled; the previous link is no longer usable.",
+                              );
+                          }}
                         >
-                          Disable invitation
+                          Cancel invitation
                         </button>
                       </>
                     ) : null}
                     {row.userId && !row.disabledAt ? (
                       <button
                         disabled={busy}
-                        onClick={() =>
-                          mutate(
-                            `/api/admin/employees/${row.userId}`,
-                            "PATCH",
-                            { action: "disable" },
-                            "Employee disabled and sessions revoked.",
+                        onClick={() => {
+                          if (
+                            window.confirm(
+                              `Deactivate ${row.email}? Their active sessions will be revoked immediately.`,
+                            )
                           )
-                        }
+                            void mutate(
+                              `/api/admin/employees/${row.userId}`,
+                              "PATCH",
+                              { action: "disable" },
+                              "Employee deactivated and sessions revoked.",
+                            );
+                        }}
                       >
-                        Disable employee
+                        Deactivate
                       </button>
                     ) : null}
                     {row.userId && row.disabledAt ? (
@@ -224,6 +239,51 @@ export function EmployeeManagement({
             ))}
           </tbody>
         </table>
+      </div>
+    </div>
+  );
+}
+
+function RoleEditor({
+  busy,
+  email,
+  role,
+  save,
+}: {
+  busy: boolean;
+  email: string;
+  role: EmployeeRole;
+  save: (role: EmployeeRole) => Promise<void>;
+}) {
+  const [selectedRole, setSelectedRole] = useState(role);
+  return (
+    <div className="flex min-w-52 flex-col gap-2">
+      <span className="text-xs text-slate-500">
+        Current: {role.replaceAll("_", " ")}
+      </span>
+      <div className="flex gap-2">
+        <select
+          aria-label={`Role for ${email}`}
+          className="min-w-0 flex-1 rounded border px-2 py-1"
+          disabled={busy}
+          onChange={(event) =>
+            setSelectedRole(event.target.value as EmployeeRole)
+          }
+          value={selectedRole}
+        >
+          {roles.map((validRole) => (
+            <option key={validRole} value={validRole}>
+              {validRole.replaceAll("_", " ")}
+            </option>
+          ))}
+        </select>
+        <button
+          disabled={busy || selectedRole === role}
+          onClick={() => void save(selectedRole)}
+          type="button"
+        >
+          Change role
+        </button>
       </div>
     </div>
   );

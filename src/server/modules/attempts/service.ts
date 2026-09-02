@@ -26,6 +26,7 @@ type AttemptRow = {
   description: string | null;
   status: "CURRENT" | "ARCHIVED";
   survey_status: "ACTIVE" | "PENDING_CAPACITY" | "COMPLETED";
+  survey_pause_reason: "MANUAL" | "INFRASTRUCTURE_CAPACITY" | null;
   generation: number;
   revision: number;
   last_mutation_id: string | null;
@@ -64,6 +65,13 @@ export class PublicAttemptService {
         const row = await this.resolve(client, publicId, token, true);
         const questions = await this.questions(client, row.survey_id);
         this.assertEditable(row);
+        if (
+          row.survey_status === "PENDING_CAPACITY" &&
+          row.survey_pause_reason === "MANUAL"
+        )
+          throw conflict(
+            "This survey is paused and is not accepting response submissions.",
+          );
         if (row.generation !== mutation.generation)
           throw conflict("This response has been replaced.");
         if (row.last_mutation_id === mutation.mutationId) {
@@ -102,7 +110,8 @@ export class PublicAttemptService {
              answered_question_count=$6,started_at=COALESCE(started_at,$7),last_activity_at=$7,last_answer_changed_at=$7
            WHERE id=$1 AND revision=$8 RETURNING *, (SELECT title FROM surveys WHERE id=survey_id) title,
              (SELECT description FROM surveys WHERE id=survey_id) description,
-             (SELECT status FROM surveys WHERE id=survey_id) survey_status`,
+             (SELECT status FROM surveys WHERE id=survey_id) survey_status,
+             (SELECT pause_reason FROM surveys WHERE id=survey_id) survey_pause_reason`,
           [
             row.id,
             envelope.sealedPayload,
@@ -140,6 +149,13 @@ export class PublicAttemptService {
         const questions = await this.questions(client, row.survey_id);
         this.assertEditable(row);
         if (
+          row.survey_status === "PENDING_CAPACITY" &&
+          row.survey_pause_reason === "MANUAL"
+        )
+          throw conflict(
+            "This survey is paused and is not accepting response submissions.",
+          );
+        if (
           row.generation !== input.generation ||
           row.revision !== input.baseRevision
         )
@@ -175,7 +191,7 @@ export class PublicAttemptService {
   ) {
     if (!token || !TOKEN_PATTERN.test(token)) throw unavailable();
     const result = await client.query<AttemptRow>(
-      `SELECT a.*,s.title,s.description,s.status survey_status FROM response_attempts a JOIN surveys s ON s.id=a.survey_id
+      `SELECT a.*,s.title,s.description,s.status survey_status,s.pause_reason survey_pause_reason FROM response_attempts a JOIN surveys s ON s.id=a.survey_id
        WHERE s.public_id=$1 AND s.tombstoned_at IS NULL AND a.attempt_token_hash=$2 ${lock ? "FOR UPDATE" : ""}`,
       [publicId, hashSecureToken(token)],
     );
@@ -237,12 +253,18 @@ export class PublicAttemptService {
     row: AttemptRow,
     questions: PublicQuestion[],
   ): PublicAttemptState {
+    const paused =
+      row.survey_status === "PENDING_CAPACITY" &&
+      row.survey_pause_reason === "MANUAL";
+    const withinEditWindow =
+      this.clock().getTime() <
+      (row.last_answer_changed_at ?? row.created_at).getTime() + 86_400_000;
     const editable =
       row.status === "CURRENT" &&
+      !paused &&
       (row.survey_status === "ACTIVE" ||
         row.survey_status === "PENDING_CAPACITY") &&
-      this.clock().getTime() <
-        (row.last_answer_changed_at ?? row.created_at).getTime() + 86_400_000;
+      withinEditWindow;
     return {
       title: row.title,
       description: row.description,
@@ -251,7 +273,11 @@ export class PublicAttemptService {
       answers: this.payload(row).answers,
       questions,
       editable,
-      recorded: !editable,
+      recorded:
+        row.status !== "CURRENT" ||
+        row.survey_status === "COMPLETED" ||
+        !withinEditWindow,
+      paused,
     };
   }
   private assertEditable(row: AttemptRow) {
