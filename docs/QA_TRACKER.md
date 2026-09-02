@@ -128,7 +128,7 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Implementation summary:** Converted the shell navigation to derive active state from the current pathname. Workspace matches only `/app`; Surveys, Respondents, and Admin match their section root and nested routes. The active link receives both visual styling and `aria-current="page"`.
 - **Tests / verification performed:** Added UI coverage for Workspace and a directly loaded nested Surveys route, including exclusive `aria-current` state. The complete non-database suite passed (46 files, 236 tests), along with typecheck, lint, formatting, production build, client-bundle scan, and production-artifact scan.
 - **Production verification status:** Not verified in production.
-- **Relevant commit:** Not yet available.
+- **Relevant commit:** `4d3fd18e6d024e61c0d1564864dd5e2a432d6808`
 
 ## QA-010
 
@@ -142,7 +142,7 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Implementation summary:** Removed the bulk pause action from the Admin infrastructure controls and placed the consistently labelled “Pause all active surveys” action on the Surveys page through a role-gated survey-management component. The existing service authorization remains Admin-only and independently enforced server-side.
 - **Tests / verification performed:** Added UI coverage proving the action renders for Admin and not Product Manager. Existing service tests prove Product Manager rejection. The complete non-database suite passed (46 files, 236 tests), along with typecheck, lint, formatting, production build, client-bundle scan, and production-artifact scan.
 - **Production verification status:** Not verified in production.
-- **Relevant commit:** Not yet available.
+- **Relevant commit:** `4d3fd18e6d024e61c0d1564864dd5e2a432d6808`
 
 ## QA-011
 
@@ -156,7 +156,7 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Implementation summary:** Reframed unused-invitation disabling as confirmed “Cancel invitation”; the existing transaction immediately clears the token hash/expiry, persists cancellation metadata, and audits the action. Added pending-invitation role correction through a validated Admin-only endpoint and transactional audited repository update; acceptance continues to resolve the assigned role from the locked server record. Replaced accidental select-on-change role mutation with an explicit Change role action showing the current role. Reframed employee disabling as confirmed Deactivate and added distinct Active, Pending/Expired invitation, Cancelled invitation, and Deactivated UI labels. Registered role changes and deactivation continue to increment authorization version, revoke sessions, and preserve user/authorship/audit records.
 - **Tests / verification performed:** Added service tests for Admin-only pending-role correction and UI tests for confirmation, explicit role submission, and lifecycle labels. Added database integration assertions that a corrected pending role is used at acceptance and audited; existing integration coverage verifies token invalidation, rejected acceptance, session revocation, authorization changes, deactivation, re-enable behavior, audits, and historical row preservation. The executable non-database suite passed (46 files, 236 tests), plus typecheck, lint, formatting, build, and security/artifact scans. Database tests could not execute because the host lacks the required `cockroach` binary.
 - **Production verification status:** Not verified in production.
-- **Relevant commit:** Not yet available.
+- **Relevant commit:** `4d3fd18e6d024e61c0d1564864dd5e2a432d6808`
 
 ## QA-012
 
@@ -170,7 +170,7 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Implementation summary:** Retained the operational block because dated actual readings are an intentional Admin safety input to quota evaluation. Added plain-language purpose and protection scope, an explanatory empty state for the quota table, and replaced the invalid free-text provider/quota combination with four exact supported choices: Netlify credits, CockroachDB request units, CockroachDB storage, and Brevo daily emails. Removed only the misplaced survey bulk action; quota evaluation, reconciliation, alerts, scheduled checks, provider links, automatic protection, and atomic high-usage survey switching remain intact.
 - **Tests / verification performed:** Updated UI tests for the explanation, constrained provider/quota input, empty state, provider link/readings, and absence of the moved survey action. Existing infrastructure estimator, authorization, reconciliation, alert, capacity, and audit tests remain intact. The complete non-database suite passed (46 files, 236 tests), along with typecheck, lint, formatting, production build, client-bundle scan, and production-artifact scan.
 - **Production verification status:** Not verified in production.
-- **Relevant commit:** Not yet available.
+- **Relevant commit:** `4d3fd18e6d024e61c0d1564864dd5e2a432d6808`
 
 ## QA-013
 
@@ -184,4 +184,4 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Implementation summary:** Added an inline confirmation step with Cancel/Pause all actions and the requested consequence text. Success refreshes the server-rendered Surveys list and shows an auto-expiring three-second success toast; failure shows an error toast without refresh or false success. The existing repository transaction atomically updates all and only ACTIVE surveys to `PENDING_CAPACITY` with `MANUAL` reason and audits the affected count. Existing/new respondent identification remains blocked while pending. For an already open response, server load now returns a manual-pause state and both answer mutations and submission reject manual pauses; automatic infrastructure-capacity pauses retain their existing recovery/autosave semantics.
 - **Tests / verification performed:** Added UI tests proving no request before confirmation, success refresh/toast, and failure behavior; retained server authorization rejection coverage; expanded database integration assertions for all-and-only ACTIVE bulk transition and unaffected Draft/Pending/Completed surveys; updated public respondent integration coverage for manual-pause load, mutation, submission, and new-identification rejection. The complete non-database suite passed (46 files, 236 tests), along with typecheck, lint, formatting, production build, client-bundle scan, and production-artifact scan. Database integration execution remains unavailable because `cockroach` is not installed on this host.
 - **Production verification status:** Not verified in production.
-- **Relevant commit:** Not yet available.
+- **Relevant commit:** `4d3fd18e6d024e61c0d1564864dd5e2a432d6808`
