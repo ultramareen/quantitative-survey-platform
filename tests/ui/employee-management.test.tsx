@@ -24,6 +24,18 @@ const pending: EmployeeManagementRow = {
   disabledAt: null,
 };
 
+const soleAdmin: EmployeeManagementRow = {
+  ...pending,
+  invitationId: null,
+  userId: "sole-admin",
+  email: "admin@synthetic.invalid",
+  displayName: "Sole Admin",
+  role: "ADMIN",
+  status: "ACTIVE",
+  invitedAt: null,
+  tokenExpiresAt: null,
+};
+
 describe("employee lifecycle management UI", () => {
   it("requires confirmation before cancelling an invitation", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
@@ -116,5 +128,20 @@ describe("employee lifecycle management UI", () => {
     );
     expect(screen.getByText("Cancelled invitation")).toBeInTheDocument();
     expect(screen.getByText("Deactivated")).toBeInTheDocument();
+  });
+
+  it("prevents and explains last-active-Admin removal in the UI", () => {
+    render(<EmployeeManagement rows={[soleAdmin]} />);
+    expect(screen.getByLabelText(`Role for ${soleAdmin.email}`)).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Deactivate" })).toBeDisabled();
+    expect(
+      screen.getByText(
+        "You cannot change the role of the last active Admin. Assign another Admin first.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Deactivate" })).toHaveAttribute(
+      "title",
+      "You cannot deactivate the last active Admin. Assign another Admin first.",
+    );
   });
 });

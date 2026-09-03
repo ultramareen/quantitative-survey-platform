@@ -99,6 +99,37 @@ describe("public respondent service", () => {
       service.identify(publicId, "A".repeat(43), input, "ip"),
     ).rejects.toMatchObject({ status: 400 });
   });
+  it.each(["+7968234", "+7968234123432"])(
+    "rejects invalid +7 length independently on the server: %s",
+    async (phone) => {
+      const { service } = fixture();
+      await expect(
+        service.identify(
+          publicId,
+          "A".repeat(43),
+          { name: "Person", phone, country: "RU" },
+          "ip",
+        ),
+      ).rejects.toMatchObject({ code: "INVALID_PHONE", status: 400 });
+    },
+  );
+  it.each([
+    ["+79682341234", "RU"],
+    ["+442079460123", "GB"],
+  ])(
+    "accepts a valid supported international phone: %s",
+    async (phone, country) => {
+      const { service } = fixture();
+      await expect(
+        service.identify(
+          publicId,
+          "A".repeat(43),
+          { name: "Person", phone, country },
+          "ip",
+        ),
+      ).resolves.toMatchObject({ identified: true });
+    },
+  );
   it("returns a uniform success without an attempt token for an existing phone", async () => {
     const { repo, service } = fixture();
     repo.createdAttempt = false;

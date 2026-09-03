@@ -70,6 +70,34 @@ function mockQuestionnaire(submitResponse: Response) {
   });
 }
 
+function mockIdentification() {
+  return vi.spyOn(globalThis, "fetch").mockImplementation((input, init) => {
+    if (String(input).endsWith("/open"))
+      return Promise.resolve(
+        new Response(
+          JSON.stringify({
+            availability: "ACTIVE",
+            identified: false,
+            title: "Public study",
+          }),
+          { status: 200 },
+        ),
+      );
+    if (init?.method === "POST")
+      return Promise.resolve(
+        new Response(JSON.stringify({ identified: true }), { status: 200 }),
+      );
+    if (String(input).endsWith("/attempt"))
+      return Promise.resolve(
+        new Response(JSON.stringify(attempt), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        }),
+      );
+    throw new Error(`Unexpected request: ${String(input)}`);
+  });
+}
+
 describe("public survey questionnaire UI", () => {
   beforeEach(() => vi.restoreAllMocks());
 
@@ -137,6 +165,63 @@ describe("public survey questionnaire UI", () => {
         expect(label).toHaveClass("items-start");
         expect(control).toHaveClass("mt-1", "shrink-0");
       }
+    },
+  );
+});
+
+describe("public survey phone validation", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it.each(["+7968234", "+7968234123432"])(
+    "rejects incomplete or overlong +7 input before submission: %s",
+    async (phone) => {
+      const fetchMock = mockIdentification();
+      render(<PublicSurveyEntry publicId="public" />);
+      fireEvent.change(await screen.findByLabelText("Your name"), {
+        target: { value: "Person" },
+      });
+      fireEvent.change(screen.getByLabelText("Phone number"), {
+        target: { value: phone },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Begin survey" }));
+      expect(
+        await screen.findByText("Enter a valid and complete phone number."),
+      ).toBeInTheDocument();
+      expect(fetchMock).toHaveBeenCalledOnce();
+      expect(screen.getByLabelText("Phone number")).toHaveValue(phone);
+    },
+  );
+
+  it.each([
+    ["+79682341234", "RU"],
+    ["+442079460123", "GB"],
+  ])(
+    "submits a valid supported international phone: %s",
+    async (phone, country) => {
+      const fetchMock = mockIdentification();
+      render(<PublicSurveyEntry publicId="public" />);
+      fireEvent.change(await screen.findByLabelText("Your name"), {
+        target: { value: "Person" },
+      });
+      fireEvent.change(screen.getByLabelText("Phone country"), {
+        target: { value: country },
+      });
+      fireEvent.change(screen.getByLabelText("Phone number"), {
+        target: { value: phone },
+      });
+      fireEvent.click(screen.getByRole("button", { name: "Begin survey" }));
+      await waitFor(() =>
+        expect(
+          fetchMock.mock.calls.some((call) => call[1]?.method === "POST"),
+        ).toBe(true),
+      );
+      const submission = fetchMock.mock.calls.find(
+        (call) => call[1]?.method === "POST",
+      )!;
+      expect(JSON.parse(String(submission[1]!.body))).toMatchObject({
+        phone,
+        country,
+      });
     },
   );
 });

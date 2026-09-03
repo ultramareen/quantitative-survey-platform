@@ -13,6 +13,7 @@ import {
   purgePending,
   retainPending,
 } from "./pending-mutations";
+import { isCompletePhone } from "@/lib/phone-validation";
 
 const countries = [
   ["US", "United States (+1)"],
@@ -41,6 +42,8 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
   const [state, setState] = useState<PublicSurveyOpenResult>();
   const [message, setMessage] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [country, setCountry] = useState("RU");
+  const [phone, setPhone] = useState("");
   useEffect(() => {
     let active = true;
     fetch(`/api/public/surveys/${encodeURIComponent(publicId)}/open`, {
@@ -76,9 +79,13 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
   }, [publicId]);
   async function identify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
     setMessage(undefined);
     const form = new FormData(event.currentTarget);
+    if (!isCompletePhone(phone, country)) {
+      setMessage("Enter a valid and complete phone number.");
+      return;
+    }
+    setBusy(true);
     const response = await fetch(
       `/api/public/surveys/${encodeURIComponent(publicId)}/identify`,
       {
@@ -86,8 +93,8 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name: form.get("name"),
-          country: form.get("country"),
-          phone: form.get("phone"),
+          country,
+          phone,
         }),
       },
     );
@@ -153,7 +160,8 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
             <select
               className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3"
               name="country"
-              defaultValue="RU"
+              onChange={(event) => setCountry(event.target.value)}
+              value={country}
             >
               {countries.map(([code, label]) => (
                 <option value={code} key={code}>
@@ -171,7 +179,19 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
               autoComplete="tel"
               inputMode="tel"
               maxLength={64}
+              onChange={(event) => setPhone(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  /^\d$/.test(event.key) &&
+                  phone.trim().startsWith("+7") &&
+                  phone.replace(/\D/g, "").length >= 11 &&
+                  event.currentTarget.selectionStart ===
+                    event.currentTarget.selectionEnd
+                )
+                  event.preventDefault();
+              }}
               required
+              value={phone}
             />
           </label>
         </div>

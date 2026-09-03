@@ -12,6 +12,9 @@ export function EmployeeManagement({
   rows: EmployeeManagementRow[];
 }) {
   const router = useRouter();
+  const activeAdminCount = rows.filter(
+    (row) => row.userId && row.role === "ADMIN" && !row.disabledAt,
+  ).length;
   const [message, setMessage] = useState<string>();
   const [busy, setBusy] = useState(false);
   async function invite(event: FormEvent<HTMLFormElement>) {
@@ -100,143 +103,157 @@ export function EmployeeManagement({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr
-                className="border-b align-top"
-                key={row.invitationId ?? row.userId}
-              >
-                <td className="p-3">
-                  <strong>{row.displayName ?? "Not registered"}</strong>
-                  <br />
-                  <span className="text-slate-600">{row.email}</span>
-                </td>
-                <td className="p-3">
-                  {row.userId || row.status === "INVITED" ? (
-                    <RoleEditor
-                      busy={busy}
-                      email={row.email}
-                      role={row.role}
-                      save={(role) =>
-                        row.userId
-                          ? mutate(
-                              `/api/admin/employees/${row.userId}`,
-                              "PATCH",
-                              { action: "change-role", role },
-                              "Role changed and sessions revoked.",
+            {rows.map((row) => {
+              const isLastActiveAdmin = Boolean(
+                row.userId &&
+                row.role === "ADMIN" &&
+                !row.disabledAt &&
+                activeAdminCount === 1,
+              );
+              return (
+                <tr
+                  className="border-b align-top"
+                  key={row.invitationId ?? row.userId}
+                >
+                  <td className="p-3">
+                    <strong>{row.displayName ?? "Not registered"}</strong>
+                    <br />
+                    <span className="text-slate-600">{row.email}</span>
+                  </td>
+                  <td className="p-3">
+                    {row.userId || row.status === "INVITED" ? (
+                      <RoleEditor
+                        busy={busy}
+                        email={row.email}
+                        protectedAdmin={isLastActiveAdmin}
+                        role={row.role}
+                        save={(role) =>
+                          row.userId
+                            ? mutate(
+                                `/api/admin/employees/${row.userId}`,
+                                "PATCH",
+                                { action: "change-role", role },
+                                "Role changed and sessions revoked.",
+                              )
+                            : mutate(
+                                `/api/admin/invitations/${row.invitationId}`,
+                                "POST",
+                                { action: "change-role", role },
+                                "Invitation role changed.",
+                              )
+                        }
+                      />
+                    ) : (
+                      row.role.replaceAll("_", " ")
+                    )}
+                  </td>
+                  <td className="p-3">
+                    {row.disabledAt
+                      ? row.userId
+                        ? "Deactivated"
+                        : "Cancelled invitation"
+                      : row.status === "INVITED" &&
+                          row.tokenExpiresAt &&
+                          new Date(row.tokenExpiresAt) <= new Date()
+                        ? "Invitation expired"
+                        : row.status === "ACTIVE"
+                          ? "Active"
+                          : row.status
+                              .toLowerCase()
+                              .replace(/^./, (c) => c.toUpperCase())}
+                  </td>
+                  <td className="p-3">
+                    {row.invitedAt
+                      ? new Date(row.invitedAt).toLocaleString()
+                      : "—"}
+                  </td>
+                  <td className="p-3">
+                    {row.tokenExpiresAt
+                      ? new Date(row.tokenExpiresAt).toLocaleString()
+                      : "—"}
+                  </td>
+                  <td className="p-3">
+                    <div className="flex flex-wrap gap-2">
+                      {row.status === "INVITED" && row.invitationId ? (
+                        <>
+                          <button
+                            disabled={busy}
+                            onClick={() =>
+                              mutate(
+                                `/api/admin/invitations/${row.invitationId}`,
+                                "POST",
+                                { action: "resend" },
+                                "Invitation resent; previous link invalidated.",
+                              )
+                            }
+                          >
+                            Resend invitation
+                          </button>
+                          <button
+                            disabled={busy}
+                            onClick={() => {
+                              if (
+                                window.confirm(
+                                  `Cancel the invitation for ${row.email}? The emailed link will stop working immediately.`,
+                                )
+                              )
+                                void mutate(
+                                  `/api/admin/invitations/${row.invitationId}`,
+                                  "POST",
+                                  { action: "cancel" },
+                                  "Invitation cancelled; the previous link is no longer usable.",
+                                );
+                            }}
+                          >
+                            Cancel invitation
+                          </button>
+                        </>
+                      ) : null}
+                      {row.userId && !row.disabledAt ? (
+                        <button
+                          disabled={busy || isLastActiveAdmin}
+                          title={
+                            isLastActiveAdmin
+                              ? "You cannot deactivate the last active Admin. Assign another Admin first."
+                              : undefined
+                          }
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                `Deactivate ${row.email}? Their active sessions will be revoked immediately.`,
+                              )
                             )
-                          : mutate(
-                              `/api/admin/invitations/${row.invitationId}`,
-                              "POST",
-                              { action: "change-role", role },
-                              "Invitation role changed.",
-                            )
-                      }
-                    />
-                  ) : (
-                    row.role.replaceAll("_", " ")
-                  )}
-                </td>
-                <td className="p-3">
-                  {row.disabledAt
-                    ? row.userId
-                      ? "Deactivated"
-                      : "Cancelled invitation"
-                    : row.status === "INVITED" &&
-                        row.tokenExpiresAt &&
-                        new Date(row.tokenExpiresAt) <= new Date()
-                      ? "Invitation expired"
-                      : row.status === "ACTIVE"
-                        ? "Active"
-                        : row.status
-                            .toLowerCase()
-                            .replace(/^./, (c) => c.toUpperCase())}
-                </td>
-                <td className="p-3">
-                  {row.invitedAt
-                    ? new Date(row.invitedAt).toLocaleString()
-                    : "—"}
-                </td>
-                <td className="p-3">
-                  {row.tokenExpiresAt
-                    ? new Date(row.tokenExpiresAt).toLocaleString()
-                    : "—"}
-                </td>
-                <td className="p-3">
-                  <div className="flex flex-wrap gap-2">
-                    {row.status === "INVITED" && row.invitationId ? (
-                      <>
+                              void mutate(
+                                `/api/admin/employees/${row.userId}`,
+                                "PATCH",
+                                { action: "disable" },
+                                "Employee deactivated and sessions revoked.",
+                              );
+                          }}
+                        >
+                          Deactivate
+                        </button>
+                      ) : null}
+                      {row.userId && row.disabledAt ? (
                         <button
                           disabled={busy}
                           onClick={() =>
                             mutate(
-                              `/api/admin/invitations/${row.invitationId}`,
-                              "POST",
-                              { action: "resend" },
-                              "Invitation resent; previous link invalidated.",
+                              `/api/admin/employees/${row.userId}`,
+                              "PATCH",
+                              { action: "reenable" },
+                              "Employee re-enabled; fresh sign-in required.",
                             )
                           }
                         >
-                          Resend invitation
+                          Re-enable employee
                         </button>
-                        <button
-                          disabled={busy}
-                          onClick={() => {
-                            if (
-                              window.confirm(
-                                `Cancel the invitation for ${row.email}? The emailed link will stop working immediately.`,
-                              )
-                            )
-                              void mutate(
-                                `/api/admin/invitations/${row.invitationId}`,
-                                "POST",
-                                { action: "cancel" },
-                                "Invitation cancelled; the previous link is no longer usable.",
-                              );
-                          }}
-                        >
-                          Cancel invitation
-                        </button>
-                      </>
-                    ) : null}
-                    {row.userId && !row.disabledAt ? (
-                      <button
-                        disabled={busy}
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              `Deactivate ${row.email}? Their active sessions will be revoked immediately.`,
-                            )
-                          )
-                            void mutate(
-                              `/api/admin/employees/${row.userId}`,
-                              "PATCH",
-                              { action: "disable" },
-                              "Employee deactivated and sessions revoked.",
-                            );
-                        }}
-                      >
-                        Deactivate
-                      </button>
-                    ) : null}
-                    {row.userId && row.disabledAt ? (
-                      <button
-                        disabled={busy}
-                        onClick={() =>
-                          mutate(
-                            `/api/admin/employees/${row.userId}`,
-                            "PATCH",
-                            { action: "reenable" },
-                            "Employee re-enabled; fresh sign-in required.",
-                          )
-                        }
-                      >
-                        Re-enable employee
-                      </button>
-                    ) : null}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -247,11 +264,13 @@ export function EmployeeManagement({
 function RoleEditor({
   busy,
   email,
+  protectedAdmin,
   role,
   save,
 }: {
   busy: boolean;
   email: string;
+  protectedAdmin: boolean;
   role: EmployeeRole;
   save: (role: EmployeeRole) => Promise<void>;
 }) {
@@ -264,7 +283,7 @@ function RoleEditor({
       <select
         aria-label={`Role for ${email}`}
         className="rounded border px-2 py-1"
-        disabled={busy}
+        disabled={busy || protectedAdmin}
         onChange={(event) => {
           const nextRole = event.target.value as EmployeeRole;
           setSelectedRole(nextRole);
@@ -280,6 +299,11 @@ function RoleEditor({
           void save(nextRole);
         }}
         value={selectedRole}
+        title={
+          protectedAdmin
+            ? "You cannot change the role of the last active Admin. Assign another Admin first."
+            : undefined
+        }
       >
         {roles.map((validRole) => (
           <option key={validRole} value={validRole}>
@@ -287,6 +311,12 @@ function RoleEditor({
           </option>
         ))}
       </select>
+      {protectedAdmin ? (
+        <span className="text-xs text-slate-600">
+          You cannot change the role of the last active Admin. Assign another
+          Admin first.
+        </span>
+      ) : null}
     </div>
   );
 }

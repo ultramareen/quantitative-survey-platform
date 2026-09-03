@@ -39,33 +39,6 @@ export class InfrastructureService {
     return this.repository.readAdminView();
   }
 
-  async reconcile(
-    actor: EmployeePrincipal | null,
-    input: {
-      provider: string;
-      quota: string;
-      period: string;
-      used: number;
-      limit: number;
-      collectedAt: Date;
-    },
-  ) {
-    const admin = requireRole(actor, ["ADMIN"]);
-    if (
-      !isApprovedQuota(input.provider, input.quota) ||
-      !input.period.trim() ||
-      !Number.isFinite(input.used) ||
-      input.used < 0 ||
-      !Number.isFinite(input.limit) ||
-      input.limit <= 0 ||
-      !Number.isFinite(input.collectedAt.getTime()) ||
-      input.collectedAt > this.now()
-    )
-      throw invalid();
-    await this.repository.reconcile({ ...input, actorId: admin.id });
-    await this.runCheck();
-  }
-
   pauseAll(actor: EmployeePrincipal | null) {
     const admin = requireRole(actor, ["ADMIN"]);
     return this.repository.pauseAll(admin.id);
@@ -123,15 +96,6 @@ export class InfrastructureService {
       observedAt,
     });
   }
-}
-
-function isApprovedQuota(provider: string, quota: string) {
-  return (
-    (provider === "NETLIFY" && quota === "CREDITS") ||
-    (provider === "COCKROACH" &&
-      (quota === "RU" || quota === "STORAGE_BYTES")) ||
-    (provider === "BREVO" && quota === "DAILY_EMAILS")
-  );
 }
 
 export function crossedThresholds(percent: number) {

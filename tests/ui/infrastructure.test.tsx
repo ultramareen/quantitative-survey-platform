@@ -26,7 +26,7 @@ describe("Phase 12 infrastructure UI", () => {
       "99",
     );
   });
-  it("explains provider readings and keeps capacity selection without the survey bulk action", () => {
+  it("keeps quota monitoring and capacity selection without manual reconciliation or the survey bulk action", () => {
     render(
       <InfrastructureAdminControls
         view={{
@@ -75,12 +75,16 @@ describe("Phase 12 infrastructure UI", () => {
     expect(
       screen.queryByRole("button", { name: "Pause all active surveys" }),
     ).not.toBeInTheDocument();
-    expect(screen.getByLabelText("Provider quota")).toHaveValue(
-      "NETLIFY:CREDITS",
-    );
+    expect(
+      screen.queryByText("Manual provider-dashboard reconciliation"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Provider quota")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Save dated manual actual" }),
+    ).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain("00000000-");
   });
-  it("explains an empty quota table instead of rendering blank controls", () => {
+  it("keeps the automated quota empty state without an empty manual UI container", () => {
     render(
       <InfrastructureAdminControls
         view={{
@@ -94,5 +98,6 @@ describe("Phase 12 infrastructure UI", () => {
     expect(
       screen.getByText(/No quota readings are available yet/),
     ).toBeInTheDocument();
+    expect(document.querySelector("form")).toBeNull();
   });
 });

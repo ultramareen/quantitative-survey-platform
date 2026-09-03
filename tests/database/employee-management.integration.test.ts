@@ -465,4 +465,114 @@ describe("Phase 4 employee management persistence", () => {
       management.reenableEmployee(admin, disposable),
     ).rejects.toMatchObject({ code: "EMPLOYEE_CAPACITY_REACHED" });
   });
+
+  it("transactionally preserves at least one active Admin under single and concurrent removals", async () => {
+    const firstId = randomUUID();
+    const secondId = randomUUID();
+    await pool.query(
+      `INSERT INTO users (id,email_normalized,display_name,email_verified,role,authorization_version,created_at,updated_at)
+       VALUES ($1,$2,'First invariant Admin',true,'ADMIN',1,$4,$4),
+              ($3,$5,'Second invariant Admin',true,'ADMIN',1,$4,$4)`,
+      [
+        firstId,
+        `admin-invariant-first-${firstId}@synthetic.invalid`,
+        secondId,
+        now,
+        `admin-invariant-second-${secondId}@synthetic.invalid`,
+      ],
+    );
+    const externalAdmins = await pool.query<{ id: string }>(
+      "SELECT id FROM users WHERE role='ADMIN' AND disabled_at IS NULL AND id <> ALL($1::UUID[])",
+      [[firstId, secondId]],
+    );
+    if (externalAdmins.rows.length)
+      await pool.query(
+        "UPDATE users SET role='RESEARCHER' WHERE id=ANY($1::UUID[])",
+        [externalAdmins.rows.map((row) => row.id)],
+      );
+    await management.disableEmployee(admin, secondId);
+
+    const before = (
+      await pool.query<{
+        role: string;
+        disabled_at: Date | null;
+        authorization_version: number;
+      }>(
+        "SELECT role,disabled_at,authorization_version FROM users WHERE id=$1",
+        [firstId],
+      )
+    ).rows[0];
+    await expect(
+      management.disableEmployee(admin, firstId),
+    ).rejects.toMatchObject({
+      code: "LAST_ACTIVE_ADMIN_REQUIRED",
+      message:
+        "You cannot deactivate the last active Admin. Assign another Admin first.",
+    });
+    await expect(
+      management.changeRole(admin, firstId, "RESEARCHER"),
+    ).rejects.toMatchObject({
+      code: "LAST_ACTIVE_ADMIN_REQUIRED",
+      message:
+        "You cannot change the role of the last active Admin. Assign another Admin first.",
+    });
+    expect(
+      (
+        await pool.query(
+          "SELECT role,disabled_at,authorization_version FROM users WHERE id=$1",
+          [firstId],
+        )
+      ).rows[0],
+    ).toEqual(before);
+
+    await pool.query("UPDATE users SET disabled_at=NULL WHERE id=$1", [
+      secondId,
+    ]);
+    await management.disableEmployee(admin, firstId);
+    expect(
+      (await pool.query("SELECT disabled_at FROM users WHERE id=$1", [firstId]))
+        .rows[0].disabled_at,
+    ).not.toBeNull();
+    await pool.query("UPDATE users SET disabled_at=NULL WHERE id=$1", [
+      firstId,
+    ]);
+    await management.changeRole(admin, firstId, "RESEARCHER");
+    expect(
+      (await pool.query("SELECT role FROM users WHERE id=$1", [firstId]))
+        .rows[0].role,
+    ).toBe("RESEARCHER");
+
+    await pool.query(
+      "UPDATE users SET role='ADMIN',disabled_at=NULL WHERE id=ANY($1::UUID[])",
+      [[firstId, secondId]],
+    );
+    const concurrent = await Promise.allSettled([
+      management.disableEmployee(admin, firstId),
+      management.changeRole(admin, secondId, "RESEARCHER"),
+    ]);
+    expect(
+      concurrent.filter((item) => item.status === "fulfilled"),
+    ).toHaveLength(1);
+    expect(
+      concurrent.filter((item) => item.status === "rejected"),
+    ).toHaveLength(1);
+    expect(
+      Number(
+        (
+          await pool.query<{ count: string }>(
+            "SELECT count(*) AS count FROM users WHERE role='ADMIN' AND disabled_at IS NULL",
+          )
+        ).rows[0].count,
+      ),
+    ).toBe(1);
+
+    if (externalAdmins.rows.length)
+      await pool.query(
+        "UPDATE users SET role='ADMIN' WHERE id=ANY($1::UUID[])",
+        [externalAdmins.rows.map((row) => row.id)],
+      );
+    await pool.query("DELETE FROM users WHERE id=ANY($1::UUID[])", [
+      [firstId, secondId],
+    ]);
+  });
 });
