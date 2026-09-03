@@ -59,17 +59,7 @@ export default async function SurveyPage({
         </p>
       ) : null}
       <SurveyActions survey={survey} employee={employee} />
-      <SurveyBuilder
-        survey={survey}
-        readOnly={!canEdit}
-        finalActions={
-          <SurveyActions
-            survey={survey}
-            employee={employee}
-            placement="footer"
-          />
-        }
-      />
+      <SurveyBuilder survey={survey} readOnly={!canEdit} />
       {survey.status !== "DRAFT" ? (
         <SurveyResults
           surveyId={survey.id}

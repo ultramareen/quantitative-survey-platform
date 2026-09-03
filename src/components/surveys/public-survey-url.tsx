@@ -43,8 +43,10 @@ export function PublicSurveyUrl({ url }: { url: string }) {
         type="button"
       >
         <span aria-hidden="true">{copied ? "✓" : "⧉"}</span>
-        {copied ? "Copied" : "Copy"}
       </button>
+      <span className="sr-only" role="status">
+        {copied ? "Copied" : ""}
+      </span>
       {error ? (
         <span className="text-red-700" role="alert">
           Copy failed. Select and copy the URL manually.

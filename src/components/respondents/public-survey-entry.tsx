@@ -336,10 +336,9 @@ function Questionnaire({ publicId }: { publicId: string }) {
     );
   if (submitted)
     return (
-      <Unavailable
-        title="Thank you"
-        body="Your response has been recorded. You may still edit it on this device during the permitted edit window."
-      />
+      <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
+        <p>Thank you. Your response has been recorded.</p>
+      </section>
     );
   return (
     <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
@@ -423,8 +422,9 @@ function QuestionField({
       ) : null}
       <div className="mt-3 grid gap-2">
         {question.options.map((o) => (
-          <label key={o.position} className="flex gap-3">
+          <label key={o.position} className="flex items-start gap-3">
             <input
+              className="mt-1 shrink-0"
               type={question.type === "SINGLE_CHOICE" ? "radio" : "checkbox"}
               name={`q-${question.position}`}
               checked={

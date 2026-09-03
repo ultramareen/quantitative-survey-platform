@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type DragEvent, type FormEvent } from "react";
 import type {
   QuestionType,
   SurveyDetail,
@@ -18,11 +18,9 @@ const blankQuestion = (): SurveyDraftInput["questions"][number] => ({
 export function SurveyBuilder({
   survey,
   readOnly = false,
-  finalActions,
 }: {
   survey?: SurveyDetail;
   readOnly?: boolean;
-  finalActions?: ReactNode;
 }) {
   const router = useRouter();
   const [title, setTitle] = useState(survey?.title ?? "");
@@ -37,7 +35,31 @@ export function SurveyBuilder({
   );
   const [message, setMessage] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [operation, setOperation] = useState<"save" | "activate">();
+  const [draggedQuestion, setDraggedQuestion] = useState<number>();
+  const [draggedOption, setDraggedOption] = useState<{
+    question: number;
+    option: number;
+  }>();
   const editable = !survey || (!readOnly && survey.status === "DRAFT");
+  const activationReady =
+    title.trim().length > 0 &&
+    title.trim().length <= 300 &&
+    description.length <= 4000 &&
+    questions.length >= 1 &&
+    questions.every(
+      (question) =>
+        question.prompt.trim().length > 0 &&
+        question.prompt.trim().length <= 4000 &&
+        (question.type === "FREE_TEXT"
+          ? question.options.length === 0
+          : question.options.length >= 2 &&
+            question.options.length <= 11 &&
+            question.options.every(
+              (option) =>
+                option.trim().length > 0 && option.trim().length <= 1000,
+            )),
+    );
   function changeQuestion(
     index: number,
     patch: Partial<SurveyDraftInput["questions"][number]>,
@@ -48,12 +70,12 @@ export function SurveyBuilder({
       ),
     );
   }
-  function move(index: number, offset: number) {
+  function moveQuestion(index: number, target: number) {
     setQuestions((value) => {
       const copy = [...value];
-      const target = index + offset;
       if (target < 0 || target >= copy.length) return value;
-      [copy[index], copy[target]] = [copy[target]!, copy[index]!];
+      const [question] = copy.splice(index, 1);
+      copy.splice(target, 0, question!);
       return copy;
     });
   }
@@ -74,10 +96,7 @@ export function SurveyBuilder({
       }),
     );
   }
-  async function save(event: FormEvent) {
-    event.preventDefault();
-    setBusy(true);
-    setMessage(undefined);
+  async function persistDraft() {
     const response = await fetch(
       survey ? `/api/surveys/${survey.id}` : "/api/surveys",
       {
@@ -90,15 +109,68 @@ export function SurveyBuilder({
       id?: string;
       message?: string;
     };
-    setBusy(false);
     if (!response.ok) {
-      setMessage(payload.message ?? "The survey could not be saved.");
-      return;
+      throw new Error(payload.message ?? "The survey could not be saved.");
     }
-    if (payload.id) router.push(`/app/surveys/${payload.id}`);
-    else {
-      setMessage("Draft saved.");
+    return payload.id ?? survey?.id;
+  }
+  async function save(event: FormEvent) {
+    event.preventDefault();
+    setBusy(true);
+    setOperation("save");
+    setMessage(undefined);
+    try {
+      const id = await persistDraft();
+      if (survey) {
+        setMessage("Draft saved.");
+        router.refresh();
+      } else if (id) router.push(`/app/surveys/${id}`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The survey could not be saved.",
+      );
+    } finally {
+      setBusy(false);
+      setOperation(undefined);
+    }
+  }
+  async function activate() {
+    if (!activationReady || busy) return;
+    setBusy(true);
+    setOperation("activate");
+    setMessage(undefined);
+    try {
+      const id = await persistDraft();
+      if (!id) throw new Error("The survey could not be activated.");
+      const response = await fetch(`/api/surveys/${id}/actions`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          action: "transition",
+          target: "ACTIVE",
+          stateVersion: survey?.stateVersion ?? 1,
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        message?: string;
+      };
+      if (!response.ok)
+        throw new Error(
+          payload.message ?? "The survey could not be activated.",
+        );
+      if (!survey) router.push(`/app/surveys/${id}`);
       router.refresh();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "The survey could not be activated.",
+      );
+    } finally {
+      setBusy(false);
+      setOperation(undefined);
     }
   }
   if (survey && !editable) return <ReadOnlyQuestions survey={survey} />;
@@ -110,6 +182,7 @@ export function SurveyBuilder({
           <input
             className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2"
             maxLength={300}
+            placeholder="Survey title — visible to respondents"
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -121,6 +194,7 @@ export function SurveyBuilder({
           <textarea
             className="mt-2 min-h-24 w-full rounded-lg border border-slate-300 px-3 py-2"
             maxLength={4000}
+            placeholder="Survey description — visible to respondents"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
@@ -141,8 +215,45 @@ export function SurveyBuilder({
       ) : null}
       {questions.map((question, index) => (
         <fieldset
-          className="rounded-xl border border-slate-200 bg-white p-5"
+          className={`rounded-xl border bg-white p-5 transition ${
+            draggedQuestion === index
+              ? "border-blue-500 opacity-70 ring-2 ring-blue-200"
+              : "border-slate-200"
+          }`}
+          data-question-index={index}
+          draggable
           key={index}
+          onDragEnd={() => setDraggedQuestion(undefined)}
+          onDragOver={(event) => {
+            if (
+              event.dataTransfer.types.includes("application/x-survey-question")
+            )
+              event.preventDefault();
+          }}
+          onDragStart={(event) => {
+            if (blocksQuestionDrag(event)) return;
+            event.dataTransfer.effectAllowed = "move";
+            event.dataTransfer.setData(
+              "application/x-survey-question",
+              String(index),
+            );
+            setDraggedQuestion(index);
+          }}
+          onDrop={(event) => {
+            if (
+              !event.dataTransfer.types.includes(
+                "application/x-survey-question",
+              )
+            )
+              return;
+            event.preventDefault();
+            const source = Number(
+              event.dataTransfer.getData("application/x-survey-question"),
+            );
+            if (!Number.isInteger(source)) return;
+            moveQuestion(source, index);
+            setDraggedQuestion(undefined);
+          }}
         >
           <legend className="px-2 font-semibold">Question {index + 1}</legend>
           <div className="grid gap-4">
@@ -200,9 +311,20 @@ export function SurveyBuilder({
                 </div>
                 {question.options.map((option, optionIndex) => (
                   <div
-                    className="mb-2 flex items-center gap-2"
+                    className={`mb-2 flex cursor-grab items-center gap-2 rounded-lg border border-transparent p-1 transition active:cursor-grabbing ${
+                      draggedOption?.question === index &&
+                      draggedOption.option === optionIndex
+                        ? "border-blue-500 bg-blue-50 opacity-70 ring-2 ring-blue-200"
+                        : "hover:border-slate-300"
+                    }`}
+                    data-option-draggable
                     data-option-index={optionIndex}
+                    draggable
                     key={optionIndex}
+                    onDragEnd={(event) => {
+                      event.stopPropagation();
+                      setDraggedOption(undefined);
+                    }}
                     onDragOver={(event) => {
                       if (
                         event.dataTransfer.types.includes(
@@ -212,6 +334,7 @@ export function SurveyBuilder({
                         event.preventDefault();
                     }}
                     onDrop={(event) => {
+                      event.stopPropagation();
                       event.preventDefault();
                       const [sourceQuestion, sourceOption] = event.dataTransfer
                         .getData("application/x-survey-option")
@@ -223,23 +346,22 @@ export function SurveyBuilder({
                       )
                         return;
                       moveOption(index, sourceOption!, optionIndex);
+                      setDraggedOption(undefined);
+                    }}
+                    onDragStart={(event) => {
+                      event.stopPropagation();
+                      if (blocksOptionDrag(event)) return;
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData(
+                        "application/x-survey-option",
+                        `${index}:${optionIndex}`,
+                      );
+                      setDraggedOption({
+                        question: index,
+                        option: optionIndex,
+                      });
                     }}
                   >
-                    <button
-                      aria-label={`Drag question ${index + 1} option ${optionIndex + 1}`}
-                      className="cursor-grab rounded border px-2 py-2 text-slate-500 active:cursor-grabbing"
-                      draggable
-                      onDragStart={(event) => {
-                        event.dataTransfer.effectAllowed = "move";
-                        event.dataTransfer.setData(
-                          "application/x-survey-option",
-                          `${index}:${optionIndex}`,
-                        );
-                      }}
-                      type="button"
-                    >
-                      <span aria-hidden="true">⋮⋮</span>
-                    </button>
                     <input
                       aria-label={`Question ${index + 1} option ${optionIndex + 1}`}
                       className="min-w-0 flex-1 rounded-lg border px-3 py-2"
@@ -254,26 +376,6 @@ export function SurveyBuilder({
                         })
                       }
                     />
-                    <button
-                      aria-label={`Move question ${index + 1} option ${optionIndex + 1} up`}
-                      disabled={optionIndex === 0}
-                      onClick={() =>
-                        moveOption(index, optionIndex, optionIndex - 1)
-                      }
-                      type="button"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      aria-label={`Move question ${index + 1} option ${optionIndex + 1} down`}
-                      disabled={optionIndex === question.options.length - 1}
-                      onClick={() =>
-                        moveOption(index, optionIndex, optionIndex + 1)
-                      }
-                      type="button"
-                    >
-                      ↓
-                    </button>
                     <button
                       type="button"
                       onClick={() =>
@@ -312,20 +414,6 @@ export function SurveyBuilder({
               ) : null}
               <button
                 type="button"
-                disabled={index === 0}
-                onClick={() => move(index, -1)}
-              >
-                Move up
-              </button>
-              <button
-                type="button"
-                disabled={index === questions.length - 1}
-                onClick={() => move(index, 1)}
-              >
-                Move down
-              </button>
-              <button
-                type="button"
                 className="text-red-700"
                 onClick={() =>
                   setQuestions((v) => v.filter((_, i) => i !== index))
@@ -361,12 +449,50 @@ export function SurveyBuilder({
           disabled={busy}
           className="rounded-lg bg-slate-200 px-5 py-3 font-medium text-slate-900 disabled:opacity-50"
         >
-          {busy ? "Saving…" : "Save Draft"}
+          {operation === "save" ? "Saving…" : "Save Draft"}
         </button>
-        {finalActions}
+        <button
+          className="rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={busy || !activationReady}
+          onClick={() => void activate()}
+          title={
+            activationReady
+              ? undefined
+              : "Complete the title and at least one valid question to activate."
+          }
+          type="button"
+        >
+          {operation === "activate" ? "Activating…" : "Activate"}
+        </button>
       </div>
     </form>
   );
+}
+
+function blocksQuestionDrag(event: DragEvent<HTMLElement>) {
+  const target = event.target;
+  if (
+    target instanceof Element &&
+    target.closest(
+      "input, textarea, select, option, button, label, [data-option-draggable]",
+    )
+  ) {
+    event.preventDefault();
+    return true;
+  }
+  return false;
+}
+
+function blocksOptionDrag(event: DragEvent<HTMLElement>) {
+  const target = event.target;
+  if (
+    target instanceof Element &&
+    target.closest("input, textarea, select, option, button, label")
+  ) {
+    event.preventDefault();
+    return true;
+  }
+  return false;
 }
 
 function ReadOnlyQuestions({ survey }: { survey: SurveyDetail }) {
