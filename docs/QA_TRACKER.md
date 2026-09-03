@@ -11,11 +11,11 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Area / screen:** Internal Shell / authenticated entry
 - **Original user-reported problem:** Immediately upon entering Internal Shell, before I have done anything, I see: “Your session is missing or expired. Sign in to continue.” This is confusing because there has been no visible session expiry or preceding user action.
 - **Expected behaviour / acceptance criteria:** A valid authenticated user must not see a stale or misleading session-expired message on normal entry. If authentication is genuinely missing, route through the correct sign-in/authentication flow instead of rendering an unexplained shell error. Eliminate any incorrect transient state caused by an initial unauthenticated request, hydration/race condition, stale client state, or similar implementation detail. Preserve fail-closed authentication and existing security boundaries.
-- **Status:** Fixed — awaiting manual production verification
+- **Status:** Verified in production
 - **Root cause:** The internal layout redirected every failed session lookup to `reason=session-required`, including a normal first visit with no session cookie. The public home page links directly to `/app`, and the sign-in page rendered that undifferentiated reason as “missing or expired.” This was deterministic server routing, not a client hydration race; valid sessions remain validated server-side and enter the shell.
 - **Implementation summary:** Missing or invalid authentication still fails closed and routes to sign-in, but the ordinary authentication redirect no longer supplies or renders a misleading expiry notice. The password-reset success notice remains intact.
 - **Tests / verification performed:** Added sign-in notice coverage for normal authentication routing and password-reset success. Existing auth service, plugin, policy, cookie, CSRF, and boundary tests passed in the 226-test unit/architecture suite. Typecheck, lint, formatting, production build, client-bundle scan, and production-artifact scan passed. Database rehearsal was not run because the host lacks the required `cockroach` executable.
-- **Production verification status:** Partially checked in production on 2026-09-02 at deployed commit `a5444208bad53f88d57368a3af1bc8a3d88becb7`: an unauthenticated `/app` request routes to `/sign-in` without the stale “missing or expired” notice. A valid authenticated entry could not be checked because no authenticated production session or user-visible controllable browser was available; manual verification remains required.
+- **Production verification status:** Verified in production. The unauthenticated routing check passed on 2026-09-02 at deployed commit `a5444208bad53f88d57368a3af1bc8a3d88becb7`, and the user subsequently confirmed during manual production testing on 2026-09-03 that the remaining authenticated-entry behaviour works as expected.
 - **Relevant commit:** `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`
 
 ## QA-002
@@ -25,11 +25,11 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Area / screen:** Survey creation / question controls
 - **Original user-reported problem:** In survey creation, Add option is currently positioned incorrectly.
 - **Expected behaviour / acceptance criteria:** Move Add option into the same question action row as Move up / Move down / Remove question. It is visually grouped with those question-level controls, green, and maintains clean spacing and responsive behaviour.
-- **Status:** Fixed — awaiting manual production verification
+- **Status:** Verified in production
 - **Root cause:** The Add option control was rendered in the answer-options heading, separately from the question action row.
 - **Implementation summary:** Moved Add option into the responsive question action row and styled it as a green action without changing option limits or question semantics.
 - **Tests / verification performed:** Added UI assertions for grouping, green styling, and existing option-limit behavior. The 226-test unit/architecture suite, typecheck, lint, formatting, production build, and artifact scans passed. Database rehearsal was unavailable because `cockroach` is not installed.
-- **Production verification status:** Deployed in production at commit `a5444208bad53f88d57368a3af1bc8a3d88becb7`; authenticated survey-editor layout verification remains manual because no authenticated production session was available.
+- **Production verification status:** Verified in production by the user during manual testing on 2026-09-03 at the deployed QA-001–QA-008 implementation; Add option placement and behaviour work as expected.
 - **Relevant commit:** `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`
 
 ## QA-003
@@ -39,11 +39,11 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Area / screen:** Survey creation / questionnaire editor
 - **Original user-reported problem:** Add question is currently at the top of the form. This becomes unusable when editing a long survey because the user has to scroll back to the top to add question 10, 15, etc.
 - **Expected behaviour / acceptance criteria:** Move Add question to the bottom of the questionnaire editor, immediately above the Save Draft / activation action area, and keep it easy to reach after editing the last question.
-- **Status:** Fixed — awaiting manual production verification
+- **Status:** Verified in production
 - **Root cause:** Add question was part of the questionnaire heading row before the mapped question list.
 - **Implementation summary:** Moved Add question after the questionnaire list and immediately before the final Save Draft / Activate action area.
 - **Tests / verification performed:** Added a DOM-order assertion proving Add question precedes the final action group after the question list. The 226-test unit/architecture suite, typecheck, lint, formatting, production build, and artifact scans passed. Database rehearsal was unavailable because `cockroach` is not installed.
-- **Production verification status:** Deployed in production at commit `a5444208bad53f88d57368a3af1bc8a3d88becb7`; authenticated long-survey editor verification remains manual because no authenticated production session was available.
+- **Production verification status:** Verified in production by the user during manual testing on 2026-09-03 at the deployed QA-001–QA-008 implementation; Add question placement works as expected.
 - **Relevant commit:** `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`
 
 ## QA-004
@@ -52,13 +52,13 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Date reported:** 2026-09-01
 - **Area / screen:** Survey creation / answer options
 - **Original user-reported problem:** Questions can currently be reordered with Move up / Move down, but answer options cannot be reordered.
-- **Expected behaviour / acceptance criteria:** Add drag-and-drop reordering for answer options. Options can be reordered only within their own question and cannot be dragged into another question. The resulting order persists in the draft. Provide an obvious drag handle and preserve keyboard/accessibility behaviour with an accessible alternative where required. Do not change question reordering unless technically necessary.
-- **Status:** Fixed — awaiting manual production verification
+- **Expected behaviour / acceptance criteria:** Original acceptance requested answer-option reordering and led to drag handles plus arrow alternatives. Manual production testing reopened the issue with corrected criteria: remove all option and question move arrows and dedicated drag handles; drag the option block itself only within its question; drag the structural question card to reorder questions; never initiate parent/question dragging from answer-option dragging or from interactive descendants; preserve ordinary text editing and control interaction; show active drag feedback; and persist both nested orders after save/reload.
+- **Status:** Fixed — awaiting production verification
 - **Root cause:** The builder stored options as an ordered array and the repository already persisted array order by position, but the UI exposed no option-reordering interaction.
-- **Implementation summary:** Added a visible per-option drag handle with question-scoped drag data and drop validation. Cross-question drops are ignored. Added Move option up/down controls as the keyboard-accessible alternative. Reordering updates the existing ordered option array, which is saved through the unchanged draft API and repository position semantics.
-- **Tests / verification performed:** Added tests for accessible up/down ordering, drag affordance, rejected cross-question drops, and the exact reordered option array submitted for draft persistence. Existing service and database ordering tests remain unchanged. The 226-test unit/architecture suite, typecheck, lint, formatting, production build, and artifact scans passed; database rehearsal could not start because `cockroach` is not installed.
-- **Production verification status:** Deployed in production at commit `a5444208bad53f88d57368a3af1bc8a3d88becb7`; drag, keyboard fallback, cross-question rejection, and saved-order behavior passed automated tests, but authenticated production interaction remains manual because no authenticated production session was available.
-- **Relevant commit:** `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`
+- **Implementation summary:** The first implementation (`3cc031a053fbdcab8c1cf854ba158dc9573f2d83`) added option drag handles and arrow alternatives. After the 2026-09-03 production finding, the reopened implementation removes those controls and the question Move up/Move down buttons. Question fieldsets and option rows are now the draggable structural surfaces, with distinct drag MIME types, question-scoped option validation, propagation isolation between nesting levels, interactive-descendant suppression, and active visual feedback. The existing ordered arrays and draft persistence path continue to save the resulting order.
+- **Tests / verification performed:** Replaced the original handle/arrow assertions with option-block and question-card drag tests, absence checks for all arrows/handles, cross-question rejection, nested-drag isolation, interactive-control suppression/editability, active drag feedback, exact option/question save order, and saved-order rendering after reload. The complete 247-test suite, typecheck, lint, formatting, production build, Prisma validation, client-bundle scan, and production-artifact scan passed.
+- **Production verification status:** Reopened on 2026-09-03 after the user manually found that the first production implementation exposed too many competing reorder controls and lacked card-level question dragging. The corrected implementation is local only and awaits production deployment and manual verification.
+- **Relevant commits:** First implementation `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`; reopened correction `d2340db15a8b71324679c7c4b4253615429ed029`.
 
 ## QA-005
 
@@ -67,11 +67,11 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Area / screen:** Survey editor / Duplicate Draft
 - **Original user-reported problem:** Currently, clicking Duplicate Draft appears to do nothing. After a delay, the title simply changes to: “[original title] (Copy)”. This creates the impression that the button is broken.
 - **Expected behaviour / acceptance criteria:** Immediately disable duplicate/repeated submission and show a clear loading state, overlay, or transition for the actual operation duration without artificial delay. On success show the duplicated draft normally; on failure show a visible error.
-- **Status:** Fixed — awaiting manual production verification
+- **Status:** Verified in production
 - **Root cause:** The duplicate request used a shared internal busy flag only to disable controls; the duplicate button text and page content gave no operation-specific pending feedback while the request was in flight.
 - **Implementation summary:** Duplicate now synchronously locks repeated submission, changes its button label, and displays an accessible content-blocking “Duplicating survey…” overlay for the real request duration. Failures remain visibly rendered and success navigates to the copied draft without artificial delay.
 - **Tests / verification performed:** Added a deferred-request UI test proving immediate pending feedback, disabled repeat submission, one network request, and navigation on success. The 226-test unit/architecture suite, typecheck, lint, formatting, production build, and artifact scans passed. Database rehearsal was unavailable because `cockroach` is not installed.
-- **Production verification status:** Deployed in production at commit `a5444208bad53f88d57368a3af1bc8a3d88becb7`; duplicate loading, submission locking, success navigation, and error behavior passed automated tests, but authenticated production interaction remains manual because no authenticated production session was available.
+- **Production verification status:** Verified in production by the user during manual testing on 2026-09-03 at the deployed QA-001–QA-008 implementation; duplicate feedback and completion work as expected.
 - **Relevant commit:** `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`
 
 ## QA-006
@@ -80,13 +80,13 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Date reported:** 2026-09-01
 - **Area / screen:** Survey editor / final actions
 - **Original user-reported problem:** Activate is currently at the top of the page.
-- **Expected behaviour / acceptance criteria:** Move Activate into the final action row at the bottom of the survey editor with Save Draft as a grey/secondary action and Activate as a green/primary action. Preserve all activation validation and lifecycle rules.
-- **Status:** Fixed — awaiting manual production verification
+- **Expected behaviour / acceptance criteria:** Keep Activate in the final action row beside grey/secondary Save Draft as a green/primary action. Manual production testing added the missing requirement that Activate becomes available as soon as the current editor contains a valid activatable survey, including a never-saved new survey, and never depends on a prior manual Save Draft. Activation must persist the current visible editor state before transitioning and must retain server validation.
+- **Status:** Fixed — awaiting production verification
 - **Root cause:** Activate was owned and rendered by the page-level SurveyActions header while Save Draft was rendered independently at the end of SurveyBuilder.
-- **Implementation summary:** Added a dedicated footer placement for the unchanged activation transition and composed it beside Save Draft in a labelled final action group. Save Draft is grey/secondary and Activate is green/primary. Non-draft lifecycle controls remain in their existing page-level location.
-- **Tests / verification performed:** Added assertions that draft Activate is absent from header actions, present in the footer placement, green, and grouped with the grey Save Draft control. Existing activation validation, authorization, lifecycle, and security tests passed as part of the 226-test suite. Typecheck, lint, formatting, production build, and artifact scans passed; database rehearsal was unavailable because `cockroach` is not installed.
-- **Production verification status:** Deployed in production at commit `a5444208bad53f88d57368a3af1bc8a3d88becb7`; authenticated survey-editor action positioning and activation behavior remain manual because no authenticated production session was available.
-- **Relevant commit:** `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`
+- **Implementation summary:** The first implementation (`3cc031a053fbdcab8c1cf854ba158dc9573f2d83`) moved the existing transition control into the footer but left it disconnected from unsaved editor state. The reopened implementation makes the builder own the activation flow: it derives readiness from the same title/question/option constraints enforced server-side, saves the current draft payload first, and only then requests the existing guarded ACTIVE transition. It supports both new and existing Drafts without stale-content activation or a separate Save Draft click; non-draft lifecycle actions remain unchanged.
+- **Tests / verification performed:** Added tests proving disabled invalid activation, immediate availability for valid current state, create-and-activate without prior save, existing-draft unsaved-state persistence before transition, exact transition version/body, and unchanged server-side activation validation coverage. The complete 247-test suite and all local quality gates passed.
+- **Production verification status:** Reopened on 2026-09-03 after the user manually verified that the first production implementation showed Activate only after Save Draft. The corrected flow is local only and awaits production deployment and manual verification.
+- **Relevant commits:** First implementation `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`; reopened correction `d2340db15a8b71324679c7c4b4253615429ed029`.
 
 ## QA-007
 
@@ -94,13 +94,13 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Date reported:** 2026-09-01
 - **Area / screen:** Activated survey / Public URL
 - **Original user-reported problem:** After survey activation, the Public URL is displayed. Add a copy-to-clipboard icon/button directly beside the URL.
-- **Expected behaviour / acceptance criteria:** Clicking the adjacent control copies the complete usable URL and gives immediate feedback such as “Copied” or a checkmark, returning to its default state after a short interval. The button has an accessible label such as “Copy public survey URL.”
-- **Status:** Fixed — awaiting manual production verification
+- **Expected behaviour / acceptance criteria:** Clicking the adjacent icon-only control copies the complete usable URL and gives immediate checkmark/screen-reader feedback, returning to its default state after a short interval. The visible “Copy” text must be absent while the stable accessible label “Copy public survey URL” remains.
+- **Status:** Fixed — awaiting production verification
 - **Root cause:** The Public URL was rendered as static code text and there was no clipboard control or client feedback state.
-- **Implementation summary:** Added an adjacent accessible “Copy public survey URL” control that copies the displayed URL, changes to a checkmark/Copied state immediately, resets after two seconds, and displays a visible fallback error if clipboard access fails.
-- **Tests / verification performed:** Added clipboard assertions for the complete URL and Copied feedback. The 226-test unit/architecture suite, typecheck, lint, formatting, production build, and artifact scans passed. Database rehearsal was unavailable because `cockroach` is not installed.
-- **Production verification status:** Deployed in production at commit `a5444208bad53f88d57368a3af1bc8a3d88becb7`; clipboard behavior passed automated browser-component tests, but the authenticated production survey-detail control remains manual because no authenticated production session was available.
-- **Relevant commit:** `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`
+- **Implementation summary:** The first implementation (`3cc031a053fbdcab8c1cf854ba158dc9573f2d83`) added a copy icon plus visible Copy/Copied text. The reopened correction removes visible text, retains the copy/check icon transition, stable accessible label, screen-reader success status, timer reset, full absolute URL copying, and visible failure fallback.
+- **Tests / verification performed:** Updated clipboard coverage to assert the complete absolute URL, icon-only rendering, persistent accessible name, checkmark feedback, and screen-reader status. The complete 247-test suite and all local quality gates passed.
+- **Production verification status:** Reopened on 2026-09-03 after the user confirmed the production control worked but requested removal of its visible Copy text. The icon-only correction is local only and awaits production deployment and manual verification.
+- **Relevant commits:** First implementation `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`; reopened correction `d2340db15a8b71324679c7c4b4253615429ed029`.
 
 ## QA-008
 
@@ -109,11 +109,11 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Area / screen:** Activated survey / Public URL
 - **Original user-reported problem:** Right now production displays: “Public URL: /survey/v82db2I1Tfjzb7vovjFneg”. This is not useful to a user who wants to send/open the survey on another device. I currently cannot conveniently open this survey on my phone.
 - **Expected behaviour / acceptance criteria:** Display a complete, clickable absolute public URL derived from the configured canonical application origin, with production using configured `APP_ORIGIN`. The URL works directly on another device and QA-007 copies the same full URL. Do not alter the underlying public survey token/id semantics.
-- **Status:** Fixed — awaiting manual production verification
+- **Status:** Verified in production
 - **Root cause:** The survey detail page constructed and rendered only the relative `/survey/<public-id>` path even though canonical `APP_ORIGIN` was already mandatory server configuration.
 - **Implementation summary:** The server now builds the absolute URL from `APP_ORIGIN` plus the unchanged public token/path. The UI displays it as a responsive clickable link and passes the identical absolute value to the copy control.
 - **Tests / verification performed:** Added a URL-construction test using a configured canonical origin plus UI link and clipboard tests for the full absolute URL. Configuration validation already enforces production `APP_ORIGIN`. The 226-test unit/architecture suite, typecheck, lint, formatting, production build, and artifact scans passed; database rehearsal was unavailable because `cockroach` is not installed.
-- **Production verification status:** Partially checked in production on 2026-09-02 at deployed commit `a5444208bad53f88d57368a3af1bc8a3d88becb7`: the complete reported URL `https://quantitative-survey-platform.netlify.app/survey/v82db2I1Tfjzb7vovjFneg` opens directly and resolves to the real “Test Survey” public screen without console errors. Display of the absolute clickable URL inside the authenticated survey-detail page remains manual because no authenticated production session was available.
+- **Production verification status:** Verified in production. The complete production URL opened successfully on 2026-09-02, and on 2026-09-03 the user confirmed opening the production survey on a phone, completing it, and submitting a response.
 - **Relevant commit:** `3cc031a053fbdcab8c1cf854ba158dc9573f2d83`
 
 ## QA-009
@@ -185,3 +185,45 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Tests / verification performed:** Added UI tests proving no request before confirmation, success refresh/toast, and failure behavior; retained server authorization rejection coverage; expanded database integration assertions for all-and-only ACTIVE bulk transition and unaffected Draft/Pending/Completed surveys; updated public respondent integration coverage for manual-pause load, mutation, submission, and new-identification rejection. The complete non-database suite passed (46 files, 236 tests), along with typecheck, lint, formatting, production build, client-bundle scan, and production-artifact scan. Database integration execution remains unavailable because `cockroach` is not installed on this host.
 - **Production verification status:** Partially verified on 2026-09-02 at deployed commit `87a8d311bec08d33ec709d793184f0faecf3101f`: the bulk action appeared on the Admin Surveys screen while one survey was ACTIVE, one was already PENDING_CAPACITY, and one was a Draft. The confirmation/bulk mutation was not executed because the authenticated Admin session was revoked during QA-011 verification. Atomic persistence, toast/refresh, unaffected states, and respondent blocking therefore remain awaiting controlled manual production verification; automated UI, authorization, repository, and respondent integration assertions cover these paths.
 - **Relevant commit:** `4d3fd18e6d024e61c0d1564864dd5e2a432d6808`
+
+## QA-014
+
+- **ID:** QA-014
+- **Date reported:** 2026-09-03
+- **Area / screen:** Public respondent / successful completion
+- **Original user-reported problem:** After successfully submitting a production response, the completion screen contains additional post-submission explanation that is not needed.
+- **Expected behaviour / acceptance criteria:** Only “Thank you. Your response has been recorded.” is shown after the server confirms successful persistence. No actions, identifiers, metadata, navigation, technical details, debug information, or additional explanatory copy appear. A failed or incomplete submission must retain its error/validation state and must never show success.
+- **Status:** Fixed — awaiting production verification
+- **Root cause:** The shared unavailable-state card rendered a separate title plus an additional edit-window explanation for the local submitted state.
+- **Implementation summary:** Replaced the submitted-state card with a dedicated minimal completion section containing exactly the required sentence. Submission and persistence logic are unchanged, and the state is still entered only after an OK response explicitly reports `submitted: true`.
+- **Tests / verification performed:** Added UI tests proving the exact minimal completion content after successful persistence, absence of the previous edit-window copy and submit action, and absence of success when the submission endpoint fails. The complete 247-test suite and all local quality gates passed.
+- **Production verification status:** The user successfully completed and submitted a production survey on a phone, revealing this issue. The corrected completion state is local only and awaits production deployment and desktop/mobile manual verification.
+- **Relevant commit:** `d2340db15a8b71324679c7c4b4253615429ed029`
+
+## QA-015
+
+- **ID:** QA-015
+- **Date reported:** 2026-09-03
+- **Area / screen:** Survey authoring / Title and Description
+- **Original user-reported problem:** The authoring UI does not make clear that the survey title and description are visible to respondents on the public survey page.
+- **Expected behaviour / acceptance criteria:** Empty fields use exactly “Survey title — visible to respondents” and “Survey description — visible to respondents” as visually muted placeholders. Each placeholder disappears during typing, reappears when emptied, never becomes form state or persisted survey content, and adds no permanent warning/helper UI. Actual public rendering remains unchanged.
+- **Status:** Fixed — awaiting production verification
+- **Root cause:** The fields had labels but no contextual empty-state guidance connecting their content to the respondent experience.
+- **Implementation summary:** Added the two requested native placeholders directly to the controlled title input and description textarea. Their values continue to come only from React editor state and the unchanged draft payload.
+- **Tests / verification performed:** Added assertions for the exact placeholders, empty underlying values, and normal replacement by authored content. Existing save/activation payload tests confirm real state—not placeholder text—is submitted. The complete 247-test suite and all local quality gates passed.
+- **Production verification status:** Local implementation awaits production deployment and manual authoring verification.
+- **Relevant commit:** `d2340db15a8b71324679c7c4b4253615429ed029`
+
+## QA-016
+
+- **ID:** QA-016
+- **Date reported:** 2026-09-03
+- **Area / screen:** Public respondent / choice answers
+- **Original user-reported problem:** Radio buttons and checkboxes sit slightly above their corresponding answer text.
+- **Expected behaviour / acceptance criteria:** Single-choice radio controls and multiple-choice checkboxes align vertically with normal single-line labels and remain naturally aligned to the first line when labels wrap. Selection behaviour, semantics, validation, ordering, and control type remain unchanged. Verify desktop and mobile layouts.
+- **Status:** Fixed — awaiting production verification
+- **Root cause:** Choice labels used a flex row with no explicit cross-axis alignment or control offset, leaving native controls aligned inconsistently against the text line box.
+- **Implementation summary:** Choice rows now use explicit top alignment, while each fixed-size radio/checkbox has a small top offset and cannot shrink. This centers it against a normal first text line and preserves natural first-line alignment for wrapped labels without changing input semantics or handlers.
+- **Tests / verification performed:** Added radio and checkbox assertions for the alignment classes with single-line and wrapping-length labels at 375 px mobile and 1280 px desktop viewport widths. Existing respondent interaction tests remain intact. The complete 247-test suite, typecheck, lint, formatting, production build, Prisma validation, client-bundle scan, and production-artifact scan passed.
+- **Production verification status:** Local implementation awaits production deployment and manual visual verification at desktop and mobile viewport sizes.
+- **Relevant commit:** `d2340db15a8b71324679c7c4b4253615429ed029`
