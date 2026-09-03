@@ -158,7 +158,8 @@ export class PgEmployeeManagementRepository implements EmployeeManagementReposit
           `UPDATE employee_invitations
            SET assigned_role = $2, status = 'INVITED', token_hash = $3,
                token_expires_at = $4, invited_by_id = $5,
-               disabled_by_id = NULL, disabled_at = NULL, updated_at = $6
+               disabled_by_id = NULL, disabled_at = NULL,
+               created_at = $6, updated_at = $6
            WHERE id = $1`,
           [
             id,
@@ -314,7 +315,7 @@ export class PgEmployeeManagementRepository implements EmployeeManagementReposit
         throw conflict("Only an invited employee can be resent an invitation.");
       await client.query(
         `UPDATE employee_invitations SET token_hash = $2, token_expires_at = $3,
-        updated_at = $4 WHERE id = $1`,
+        created_at = $4, updated_at = $4 WHERE id = $1`,
         [input.invitationId, input.tokenHash, input.expiresAt, input.now],
       );
       await audit(

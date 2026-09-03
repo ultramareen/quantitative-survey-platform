@@ -279,7 +279,16 @@ function RoleEditor({
         </select>
         <button
           disabled={busy || selectedRole === role}
-          onClick={() => void save(selectedRole)}
+          onClick={() => {
+            if (
+              selectedRole === "ADMIN" &&
+              !window.confirm(
+                `${email} will receive Admin permissions. Confirm this role change?`,
+              )
+            )
+              return;
+            void save(selectedRole);
+          }}
           type="button"
         >
           Change role

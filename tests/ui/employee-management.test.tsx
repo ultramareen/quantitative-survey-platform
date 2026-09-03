@@ -51,6 +51,7 @@ describe("employee lifecycle management UI", () => {
         headers: { "content-type": "application/json" },
       }),
     );
+    const confirm = vi.spyOn(window, "confirm");
     render(<EmployeeManagement rows={[pending]} />);
     fireEvent.change(screen.getByLabelText(`Role for ${pending.email}`), {
       target: { value: "RESEARCHER" },
@@ -58,9 +59,38 @@ describe("employee lifecycle management UI", () => {
     expect(fetchMock).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Change role" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(confirm).not.toHaveBeenCalled();
     expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))).toEqual({
       action: "change-role",
       role: "RESEARCHER",
+    });
+  });
+
+  it("requires an explicit confirmation before assigning Admin", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<EmployeeManagement rows={[pending]} />);
+    fireEvent.change(screen.getByLabelText(`Role for ${pending.email}`), {
+      target: { value: "ADMIN" },
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
+    expect(confirm).toHaveBeenCalledWith(
+      `${pending.email} will receive Admin permissions. Confirm this role change?`,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))).toEqual({
+      action: "change-role",
+      role: "ADMIN",
     });
   });
 
