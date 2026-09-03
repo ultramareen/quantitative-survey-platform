@@ -261,39 +261,32 @@ function RoleEditor({
       <span className="text-xs text-slate-500">
         Current: {role.replaceAll("_", " ")}
       </span>
-      <div className="flex gap-2">
-        <select
-          aria-label={`Role for ${email}`}
-          className="min-w-0 flex-1 rounded border px-2 py-1"
-          disabled={busy}
-          onChange={(event) =>
-            setSelectedRole(event.target.value as EmployeeRole)
-          }
-          value={selectedRole}
-        >
-          {roles.map((validRole) => (
-            <option key={validRole} value={validRole}>
-              {validRole.replaceAll("_", " ")}
-            </option>
-          ))}
-        </select>
-        <button
-          disabled={busy || selectedRole === role}
-          onClick={() => {
-            if (
-              selectedRole === "ADMIN" &&
-              !window.confirm(
-                `${email} will receive Admin permissions. Confirm this role change?`,
-              )
+      <select
+        aria-label={`Role for ${email}`}
+        className="rounded border px-2 py-1"
+        disabled={busy}
+        onChange={(event) => {
+          const nextRole = event.target.value as EmployeeRole;
+          setSelectedRole(nextRole);
+          if (
+            nextRole === "ADMIN" &&
+            !window.confirm(
+              "Вы хотите назначить роль «Администратор». Вы уверены?",
             )
-              return;
-            void save(selectedRole);
-          }}
-          type="button"
-        >
-          Change role
-        </button>
-      </div>
+          ) {
+            setSelectedRole(role);
+            return;
+          }
+          void save(nextRole);
+        }}
+        value={selectedRole}
+      >
+        {roles.map((validRole) => (
+          <option key={validRole} value={validRole}>
+            {validRole.replaceAll("_", " ")}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }
