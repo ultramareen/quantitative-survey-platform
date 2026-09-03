@@ -44,7 +44,7 @@ describe("employee lifecycle management UI", () => {
     });
   });
 
-  it("changes a pending invitation role only after the explicit action", async () => {
+  it("changes a non-Admin role directly from the selector", async () => {
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify({ success: true }), {
         status: 200,
@@ -56,10 +56,11 @@ describe("employee lifecycle management UI", () => {
     fireEvent.change(screen.getByLabelText(`Role for ${pending.email}`), {
       target: { value: "RESEARCHER" },
     });
-    expect(fetchMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     expect(confirm).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole("button", { name: "Change role" }),
+    ).not.toBeInTheDocument();
     expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))).toEqual({
       action: "change-role",
       role: "RESEARCHER",
@@ -78,15 +79,18 @@ describe("employee lifecycle management UI", () => {
     fireEvent.change(screen.getByLabelText(`Role for ${pending.email}`), {
       target: { value: "ADMIN" },
     });
-    expect(fetchMock).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
     expect(confirm).toHaveBeenCalledWith(
-      `${pending.email} will receive Admin permissions. Confirm this role change?`,
+      "Вы хотите назначить роль «Администратор». Вы уверены?",
     );
     expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(`Role for ${pending.email}`)).toHaveValue(
+      "PRODUCT_MANAGER",
+    );
 
     confirm.mockReturnValue(true);
-    fireEvent.click(screen.getByRole("button", { name: "Change role" }));
+    fireEvent.change(screen.getByLabelText(`Role for ${pending.email}`), {
+      target: { value: "ADMIN" },
+    });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     expect(JSON.parse(String(fetchMock.mock.calls[0]![1]!.body))).toEqual({
       action: "change-role",
