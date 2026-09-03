@@ -92,11 +92,29 @@ describe("Phase 4 employee management persistence", () => {
       true,
     );
     expect(JSON.stringify(stored.rows[0])).not.toContain(oldToken);
+    const originalInvitedAt = (
+      await pool.query<{ created_at: Date }>(
+        "SELECT created_at FROM employee_invitations WHERE id=$1",
+        [created.invitationId],
+      )
+    ).rows[0].created_at;
+    now = new Date(now.getTime() + 60 * 60 * 1000);
     await management.resend(admin, created.invitationId);
     const newToken = new URL(
       mail.messages.at(-1)!.invitationUrl,
     ).searchParams.get("token")!;
     expect(newToken).not.toBe(oldToken);
+    const refreshedTiming = (
+      await pool.query<{ created_at: Date; token_expires_at: Date }>(
+        "SELECT created_at, token_expires_at FROM employee_invitations WHERE id=$1",
+        [created.invitationId],
+      )
+    ).rows[0];
+    expect(refreshedTiming.created_at).toEqual(now);
+    expect(refreshedTiming.created_at).not.toEqual(originalInvitedAt);
+    expect(refreshedTiming.token_expires_at.getTime() - now.getTime()).toBe(
+      INVITATION_LIFETIME_MS,
+    );
     expect(await management.preview(oldToken)).toBeNull();
     expect(await management.preview(newToken)).toMatchObject({
       email: "pm.synthetic@example.com",
@@ -188,6 +206,7 @@ describe("Phase 4 employee management persistence", () => {
     expect(serialized).not.toContain(oldToken);
     expect(serialized).not.toContain(newToken);
     expect(serialized).not.toContain(employeePassword);
+    now = new Date("2026-08-27T12:00:00Z");
   });
   it("reuses a disabled unused invitation and classifies every existing-email state", async () => {
     const email = "reinvite@synthetic.invalid";
@@ -199,6 +218,13 @@ describe("Phase 4 employee management persistence", () => {
       mail.messages.at(-1)!.invitationUrl,
     ).searchParams.get("token")!;
     const oldHash = hashSecureToken(oldToken);
+    const originalTiming = await pool.query<{
+      created_at: Date;
+      token_expires_at: Date;
+    }>(
+      "SELECT created_at, token_expires_at FROM employee_invitations WHERE id=$1",
+      [original.invitationId],
+    );
     await management.disableInvitation(admin, original.invitationId);
     now = new Date(now.getTime() + 60 * 60 * 1000);
     const reactivated = await management.createInvitation(admin, {
@@ -225,9 +251,13 @@ describe("Phase 4 employee management persistence", () => {
       token_hash: Buffer;
       disabled_by_id: string | null;
       disabled_at: Date | null;
+      created_at: Date;
+      token_expires_at: Date;
+      registered_user_id: string | null;
     }>(
       `SELECT count(*) OVER () AS count, assigned_role, status, token_hash,
-              disabled_by_id, disabled_at
+              disabled_by_id, disabled_at, created_at, token_expires_at,
+              registered_user_id
          FROM employee_invitations WHERE email_normalized = $1`,
       [email],
     );
@@ -237,7 +267,16 @@ describe("Phase 4 employee management persistence", () => {
       status: "INVITED",
       disabled_by_id: null,
       disabled_at: null,
+      created_at: now,
+      token_expires_at: reactivated.expiresAt,
+      registered_user_id: null,
     });
+    expect(rows.rows[0].created_at).not.toEqual(
+      originalTiming.rows[0].created_at,
+    );
+    expect(rows.rows[0].token_expires_at).not.toEqual(
+      originalTiming.rows[0].token_expires_at,
+    );
     expect(rows.rows[0].token_hash.equals(oldHash)).toBe(false);
     expect(rows.rows[0].token_hash.equals(hashSecureToken(newToken))).toBe(
       true,
