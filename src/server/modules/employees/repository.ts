@@ -390,7 +390,17 @@ export class PgEmployeeManagementRepository implements EmployeeManagementReposit
     now: Date;
   }) {
     await this.transaction(async (client) => {
+      const activeAdminIds = await this.lockActiveAdmins(client);
       const user = await this.lockUser(client, input.userId);
+      if (
+        user.role === "ADMIN" &&
+        !user.disabledAt &&
+        input.role !== "ADMIN" &&
+        activeAdminIds.length === 1
+      )
+        throw lastAdmin(
+          "You cannot change the role of the last active Admin. Assign another Admin first.",
+        );
       await client.query(
         "UPDATE users SET role = $2, authorization_version = authorization_version + 1, updated_at = $3 WHERE id = $1",
         [input.userId, input.role, input.now],
@@ -414,7 +424,16 @@ export class PgEmployeeManagementRepository implements EmployeeManagementReposit
 
   async disableEmployee(input: { actorId: string; userId: string; now: Date }) {
     await this.transaction(async (client) => {
-      await this.lockUser(client, input.userId);
+      const activeAdminIds = await this.lockActiveAdmins(client);
+      const user = await this.lockUser(client, input.userId);
+      if (
+        user.role === "ADMIN" &&
+        !user.disabledAt &&
+        activeAdminIds.length === 1
+      )
+        throw lastAdmin(
+          "You cannot deactivate the last active Admin. Assign another Admin first.",
+        );
       await client.query(
         "UPDATE users SET disabled_at = $2, authorization_version = authorization_version + 1, updated_at = $2 WHERE id = $1",
         [input.userId, input.now],
@@ -483,13 +502,23 @@ export class PgEmployeeManagementRepository implements EmployeeManagementReposit
     return result.rows[0];
   }
 
-  private async lockUser(client: PoolClient, id: string) {
-    const result = await client.query<{ role: EmployeeRole }>(
-      "SELECT role FROM users WHERE id = $1 FOR UPDATE",
-      [id],
+  private async lockActiveAdmins(client: PoolClient) {
+    const result = await client.query<{ id: string }>(
+      "SELECT id FROM users WHERE role = 'ADMIN' AND disabled_at IS NULL ORDER BY id FOR UPDATE",
     );
+    return result.rows.map((row) => row.id);
+  }
+
+  private async lockUser(client: PoolClient, id: string) {
+    const result = await client.query<{
+      role: EmployeeRole;
+      disabled_at: Date | null;
+    }>("SELECT role, disabled_at FROM users WHERE id = $1 FOR UPDATE", [id]);
     if (!result.rows[0]) throw conflict("Employee was not found.");
-    return result.rows[0];
+    return {
+      role: result.rows[0].role,
+      disabledAt: result.rows[0].disabled_at,
+    };
   }
 
   private async transaction<T>(
@@ -551,6 +580,12 @@ async function revokeSessions(client: PoolClient, userId: string, now: Date) {
 function conflict(message: string) {
   return Object.assign(new Error(message), {
     code: "EMPLOYEE_CONFLICT",
+    status: 409,
+  });
+}
+function lastAdmin(message: string) {
+  return Object.assign(new Error(message), {
+    code: "LAST_ACTIVE_ADMIN_REQUIRED",
     status: 409,
   });
 }

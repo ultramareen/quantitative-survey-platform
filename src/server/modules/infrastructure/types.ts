@@ -23,15 +23,6 @@ export type AlertLatch = {
 export interface InfrastructureRepository {
   readHeadline(): Promise<InfrastructureHeadline>;
   readAdminView(): Promise<InfrastructureAdminView>;
-  reconcile(input: {
-    provider: string;
-    quota: string;
-    period: string;
-    used: number;
-    limit: number;
-    collectedAt: Date;
-    actorId: string;
-  }): Promise<void>;
   evaluate(now: Date): Promise<UsageReading[]>;
   reserveThresholds(readings: UsageReading[]): Promise<AlertLatch[]>;
   activeAdminEmails(): Promise<string[]>;

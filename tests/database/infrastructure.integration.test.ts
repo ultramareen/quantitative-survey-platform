@@ -54,25 +54,6 @@ describe("Phase 12 infrastructure persistence and capacity invariants", () => {
     return { id, publicId };
   }
 
-  it("uses a dated manual actual ahead of a later application estimate for the same period", async () => {
-    await repository.reconcile({
-      provider: "NETLIFY",
-      quota: "CREDITS",
-      period: "2026-08",
-      used: 150,
-      limit: 300,
-      collectedAt: new Date("2026-08-29T10:00:00Z"),
-      actorId: adminId,
-    });
-    await repository.evaluate(now);
-    const view = await repository.readAdminView();
-    expect(
-      view.quotas.find(
-        (quota) => quota.provider === "NETLIFY" && quota.quota === "CREDITS",
-      ),
-    ).toMatchObject({ source: "MANUAL_ACTUAL", percent: 50 });
-  });
-
   it("keeps exactly one ACTIVE at 95% and pauses every ACTIVE when there are two or more", async () => {
     await pool.query("DELETE FROM surveys WHERE owner_id=$1", [ownerId]);
     const only = await survey("ACTIVE", "Only active");
@@ -137,7 +118,6 @@ describe("Phase 12 infrastructure persistence and capacity invariants", () => {
     );
     expect(audits.rows.map((row) => row.action)).toEqual(
       expect.arrayContaining([
-        "INFRASTRUCTURE_MANUAL_RECONCILIATION",
         "INFRASTRUCTURE_PAUSE_ALL",
         "INFRASTRUCTURE_ATOMIC_SWITCH",
       ]),

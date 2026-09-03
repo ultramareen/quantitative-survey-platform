@@ -48,7 +48,6 @@ function repository(overrides: Partial<InfrastructureRepository> = {}) {
   return {
     readHeadline: vi.fn(),
     readAdminView: vi.fn(),
-    reconcile: vi.fn(),
     evaluate: vi.fn().mockResolvedValue([reading(0)]),
     reserveThresholds: vi.fn().mockResolvedValue([]),
     activeAdminEmails: vi.fn().mockResolvedValue(["admin@example.com"]),
@@ -131,7 +130,7 @@ describe("Phase 12 infrastructure service authorization and protection", () => {
     );
     expect(repo.readHeadline).toHaveBeenCalledOnce();
   });
-  it("denies Admin detail, reconciliation, Pause All, and switch to Product Manager", async () => {
+  it("denies Admin detail, Pause All, and switch to Product Manager", () => {
     const service = new InfrastructureService(
       repository(),
       { sendAlert: vi.fn() },
@@ -140,35 +139,6 @@ describe("Phase 12 infrastructure service authorization and protection", () => {
     expect(() => service.adminView(manager)).toThrow();
     expect(() => service.pauseAll(manager)).toThrow();
     expect(() => service.switchActive(manager, "public")).toThrow();
-    await expect(
-      service.reconcile(manager, {
-        provider: "NETLIFY",
-        quota: "CREDITS",
-        period: "2026-08",
-        used: 1,
-        limit: 300,
-        collectedAt: at,
-      }),
-    ).rejects.toMatchObject({ status: 403 });
-  });
-  it("persists dated manual actuals and immediately evaluates capacity", async () => {
-    const repo = repository();
-    await new InfrastructureService(
-      repo,
-      { sendAlert: vi.fn() },
-      () => at,
-    ).reconcile(admin, {
-      provider: "NETLIFY",
-      quota: "CREDITS",
-      period: "2026-08",
-      used: 285,
-      limit: 300,
-      collectedAt: at,
-    });
-    expect(repo.reconcile).toHaveBeenCalledWith(
-      expect.objectContaining({ actorId: "admin" }),
-    );
-    expect(repo.evaluate).toHaveBeenCalledOnce();
   });
   it.each([95, 99, 120])(
     "runs protection at a primary risk of %s without special 99%% completion behavior",
