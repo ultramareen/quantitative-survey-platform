@@ -267,5 +267,19 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Root cause:** The explicit Change role button prevented select-on-change persistence, but treated Admin and ordinary target roles identically when the button was activated.
 - **Implementation summary:** Added an Admin-target-only confirmation at the actual submit boundary. A cancelled confirmation returns before the mutation call; an affirmative confirmation uses the unchanged server-authorized employee or pending-invitation role endpoint. Non-Admin role changes retain the existing one-step Change role behavior.
 - **Tests / verification performed:** Added UI assertions that selection alone is non-mutating, cancellation makes no request, the confirmation explains Admin permissions, confirmation submits `ADMIN`, and ordinary role changes bypass this extra confirmation. Existing service tests continue to prove backend Admin-only authorization. The full 250-test application suite, database rehearsals, and all requested local quality/security/artifact gates passed.
-- **Production verification status:** Not deployed; local verification only. No production roles or users were changed.
+- **Production verification status:** Deployed in production commit `982c258a0dc435a47bb1d30e181be8be515e29b0`. Subsequent manual review found the intermediate Change role button redundant and requested an immediate selection-driven flow with revised confirmation copy; that distinct refinement is tracked as QA-021.
 - **Relevant commit:** `3cac4b67ef07c8bc7483fcc932c33cf161199400`
+
+## QA-021
+
+- **ID:** QA-021
+- **Date reported:** 2026-09-03
+- **Area / screen:** Admin / employee role assignment
+- **Original user-reported problem:** The role-change flow unnecessarily requires selecting a role and then clicking Change role. The Admin confirmation also needs clearer prescribed copy and must reset the selector when cancelled.
+- **Expected behaviour / acceptance criteria:** Remove the Change role button. Selecting a non-Admin role immediately invokes the existing authorized role-change flow. Selecting Admin immediately presents `Вы хотите назначить роль «Администратор». Вы уверены?`; confirmation persists Admin through the existing backend path, while cancellation sends no mutation and restores the dropdown to the employee's current role. Existing backend authorization and Admin-role safety logic remain unchanged.
+- **Status:** Fixed — awaiting production verification
+- **Root cause:** QA-019 added its Admin confirmation at the explicit Change role button boundary, retaining the older two-step selector-plus-button interaction. Cancelling that confirmation also left the locally controlled selector displaying Admin.
+- **Implementation summary:** Removed Change role from the role editor and moved submission to the selector's change handler. Non-Admin selections call the unchanged mutation immediately. Admin selection invokes the exact requested confirmation first; cancellation resets local selector state to the current persisted role, and confirmation calls the same authorized backend mutation.
+- **Tests / verification performed:** Updated UI coverage to prove the button is absent, non-Admin selection persists immediately without confirmation, Admin selection uses the exact confirmation copy, cancellation makes no request and restores the prior value, and confirmation submits Admin. Existing service authorization coverage remains unchanged. The full local application suite passed (48 files / 250 tests), along with typecheck, lint, formatting, production build, client-bundle scan, and production-artifact scan.
+- **Production verification status:** Not deployed; local verification only. No production roles or users were changed.
+- **Relevant commit:** `aa2ddff409bc1df1207dd17f38bc5141b9284179`
