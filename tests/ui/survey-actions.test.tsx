@@ -63,19 +63,11 @@ describe("survey actions UI", () => {
     fetchMock.mockRestore();
   });
 
-  it("renders activation only in the footer placement", () => {
-    const { rerender } = render(
-      <SurveyActions survey={survey} employee={employee} />,
-    );
+  it("does not render Draft activation among the header lifecycle actions", () => {
+    render(<SurveyActions survey={survey} employee={employee} />);
     expect(
       screen.queryByRole("button", { name: "Activate" }),
     ).not.toBeInTheDocument();
-    rerender(
-      <SurveyActions survey={survey} employee={employee} placement="footer" />,
-    );
-    expect(screen.getByRole("button", { name: "Activate" })).toHaveClass(
-      "bg-emerald-700",
-    );
   });
 
   it("shows a visible duplicate error and releases the lock", async () => {
@@ -111,6 +103,10 @@ describe("survey actions UI", () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(url));
     expect(
       screen.getByRole("button", { name: "Copy public survey URL" }),
-    ).toHaveTextContent("Copied");
+    ).toHaveTextContent("✓");
+    expect(screen.getByRole("status")).toHaveTextContent("Copied");
+    expect(
+      screen.getByRole("button", { name: "Copy public survey URL" }),
+    ).not.toHaveTextContent("Copy");
   });
 });

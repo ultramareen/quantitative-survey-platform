@@ -7,11 +7,9 @@ import type { SurveyDetail, SurveyStatus } from "@/types/survey";
 export function SurveyActions({
   survey,
   employee,
-  placement = "header",
 }: {
   survey: SurveyDetail;
   employee: EmployeePrincipal;
-  placement?: "header" | "footer";
 }) {
   const router = useRouter();
   const [message, setMessage] = useState<string>();
@@ -79,26 +77,6 @@ export function SurveyActions({
   }
   const transition = (target: SurveyStatus) =>
     act({ action: "transition", target, stateVersion: survey.stateVersion });
-  if (placement === "footer") {
-    if (survey.status !== "DRAFT" || !lifecycle) return null;
-    return (
-      <>
-        <button
-          disabled={busy}
-          className="rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white disabled:opacity-50"
-          onClick={() => transition("ACTIVE")}
-          type="button"
-        >
-          {busy ? "Activating…" : "Activate"}
-        </button>
-        {message ? (
-          <p className="w-full text-sm text-red-700" role="alert">
-            {message}
-          </p>
-        ) : null}
-      </>
-    );
-  }
   return (
     <div className="mt-5 flex flex-wrap items-center gap-3">
       {survey.status === "ACTIVE" && lifecycle ? (
