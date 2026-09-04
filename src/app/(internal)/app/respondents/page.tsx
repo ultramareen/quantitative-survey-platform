@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
-import { RespondentTable } from "@/components/respondents/respondent-table";
+import { RespondentFilters } from "@/components/respondents/respondent-filters";
+import { RespondentResults } from "@/components/respondents/respondent-results";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import { getInternalRespondentService } from "@/server/modules/respondents/internal-runtime";
 import { getSurveyService } from "@/server/modules/surveys/runtime";
@@ -38,40 +39,15 @@ export default async function RespondentsPage({
       <p className="mt-2 text-slate-600">
         Locate respondents by their exact reference ID or review a survey.
       </p>
-      <form className="mt-6 grid gap-4 rounded-xl border border-slate-200 bg-slate-50 p-4 md:grid-cols-[1fr_1fr_auto]">
-        <label className="text-sm font-medium">
-          Reference ID
-          <input
-            className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal uppercase"
-            defaultValue={query.referenceId}
-            maxLength={15}
-            name="referenceId"
-            placeholder="R-7K3M9W2X8Q4D"
-          />
-        </label>
-        <label className="text-sm font-medium">
-          Survey
-          <select
-            className="mt-1 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-normal"
-            defaultValue={query.surveyId ?? ""}
-            name="surveyId"
-          >
-            <option value="">All surveys</option>
-            {surveys.map((survey) => (
-              <option key={survey.id} value={survey.id}>
-                {survey.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button className="self-end rounded-lg bg-blue-700 px-4 py-2 font-medium text-white">
-          Search
-        </button>
-      </form>
-      <p className="mt-5 text-sm text-slate-500">
-        {result.total} respondent{result.total === 1 ? "" : "s"}
-      </p>
-      <RespondentTable respondents={result.respondents} />
+      <RespondentFilters
+        referenceId={query.referenceId}
+        surveyId={query.surveyId}
+        surveys={surveys}
+      />
+      <RespondentResults
+        respondents={result.respondents}
+        total={result.total}
+      />
       <Pagination
         page={result.page}
         pageSize={result.pageSize}

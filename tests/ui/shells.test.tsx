@@ -101,6 +101,23 @@ describe("responsive and accessible foundation primitives", () => {
     );
   });
 
+  it("keeps Administration active on employee management", () => {
+    currentPath = "/app/admin/employees";
+    render(
+      <InternalShell employee={employee}>
+        <h1>Employees and invitations</h1>
+      </InternalShell>,
+    );
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute(
+      "href",
+      "/app/admin",
+    );
+    expect(screen.getByRole("link", { name: "Admin" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
   it("does not render respondent navigation for Product Managers", () => {
     render(
       <InternalShell employee={{ ...employee, role: "PRODUCT_MANAGER" }}>

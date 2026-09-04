@@ -163,10 +163,40 @@ describe("public survey questionnaire UI", () => {
           labelText === singleLabel ? "radio" : "checkbox",
         );
         expect(label).toHaveClass("items-start");
-        expect(control).toHaveClass("mt-1", "shrink-0");
+        expect(control).toHaveClass(
+          "respondent-choice-control",
+          "mt-1",
+          "shrink-0",
+        );
       }
     },
   );
+
+  it("uses an in-card question heading instead of a border-cutting legend", async () => {
+    mockQuestionnaire(
+      new Response(JSON.stringify({ submitted: true }), { status: 200 }),
+    );
+    const { container } = render(<PublicSurveyEntry publicId="public" />);
+
+    await screen.findByText("1. Single choice");
+    const group = container.querySelector(
+      'fieldset[aria-labelledby="question-1-heading"]',
+    )!;
+    expect(group).toHaveAttribute("role", "group");
+    expect(group.querySelector("legend")).toBeNull();
+    expect(
+      group.querySelector(".respondent-question-heading"),
+    ).toHaveTextContent("1. Single choiceRequired");
+    expect(screen.getByText("Optional")).toHaveClass(
+      "text-sm",
+      "font-normal",
+      "text-slate-500",
+    );
+    expect(container.querySelectorAll("legend")).toHaveLength(0);
+    expect(screen.getByRole("button", { name: "Submit response" })).toHaveClass(
+      "bg-blue-700",
+    );
+  });
 });
 
 describe("public survey phone validation", () => {

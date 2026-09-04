@@ -409,9 +409,11 @@ function QuestionField({
   if (question.type === "FREE_TEXT")
     return (
       <label className="respondent-question grid gap-2 font-medium">
-        {heading}{" "}
-        <span className="text-sm font-normal text-slate-500">
-          {question.required ? "Required" : "Optional"}
+        <span className="respondent-question-heading">
+          <span>{heading}</span>
+          <span className="text-sm font-normal text-slate-500">
+            {question.required ? "Required" : "Optional"}
+          </span>
         </span>
         {missing ? (
           <span role="alert" className="text-sm text-red-700">
@@ -427,14 +429,19 @@ function QuestionField({
         />
       </label>
     );
+  const headingId = `question-${question.position}-heading`;
   return (
-    <fieldset className="respondent-question">
-      <legend className="font-medium">
-        {heading}{" "}
+    <fieldset
+      aria-labelledby={headingId}
+      className="respondent-question"
+      role="group"
+    >
+      <div className="respondent-question-heading font-medium" id={headingId}>
+        <span>{heading}</span>
         <span className="text-sm font-normal text-slate-500">
           {question.required ? "Required" : "Optional"}
         </span>
-      </legend>
+      </div>
       {missing ? (
         <p role="alert" className="mt-2 text-sm text-red-700">
           This required question needs an answer.
@@ -444,7 +451,7 @@ function QuestionField({
         {question.options.map((o) => (
           <label key={o.position} className="flex items-start gap-3">
             <input
-              className="mt-1 shrink-0"
+              className="respondent-choice-control mt-1 shrink-0"
               type={question.type === "SINGLE_CHOICE" ? "radio" : "checkbox"}
               name={`q-${question.position}`}
               checked={
