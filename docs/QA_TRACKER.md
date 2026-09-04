@@ -353,4 +353,4 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Implementation summary:** Added a respondent-only route theme boundary with independent light surface, text, border, and interaction tokens. Public survey panels and reusable question containers receive semantic respondent classes; the internal product token values and authenticated components are unchanged.
 - **Tests / verification performed:** Added coverage for the route-level respondent theme boundary, exact white/near-black token values, reuse of the semantic success token, light color scheme, and shared question-block style. Existing public survey interaction tests continue to cover identification, controls, validation, autosave, submission, and exact completion copy.
 - **Production verification status:** Local implementation only. No Netlify build, Deploy Preview rebuild, push, merge, production deploy, or production mutation was performed.
-- **Relevant commit:** Pending local implementation commit.
+- **Relevant commit:** `1709816b6be360dfbe7afe80b38f12aa11ba9355`
