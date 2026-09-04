@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { InternalShell } from "@/components/layout/internal-shell";
 import { PublicShell } from "@/components/layout/public-shell";
+import SurveyLayout from "@/app/(public)/survey/[publicId]/layout";
 import { FormField } from "@/components/ui/form-field";
 import { LoadingState } from "@/components/ui/loading-state";
 
@@ -40,6 +41,19 @@ describe("responsive and accessible foundation primitives", () => {
     ).toHaveAttribute("href", "/");
   });
 
+  it("scopes public surveys to the separate respondent theme", () => {
+    const { container } = render(
+      <SurveyLayout>
+        <h1>Respondent content</h1>
+      </SurveyLayout>,
+    );
+
+    expect(container.firstElementChild).toHaveClass("respondent-theme");
+    expect(
+      screen.getByRole("heading", { name: "Respondent content" }),
+    ).toBeInTheDocument();
+  });
+
   it("renders semantic internal navigation with responsive layout classes", () => {
     currentPath = "/app";
     const { container } = render(
@@ -55,6 +69,12 @@ describe("responsive and accessible foundation primitives", () => {
     ).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass("lg:grid");
     expect(screen.getByRole("navigation")).toHaveClass("flex-wrap");
+    expect(container.querySelector("aside")).toHaveClass(
+      "lg:sticky",
+      "lg:top-0",
+      "lg:h-screen",
+      "lg:overflow-y-auto",
+    );
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Respondents" })).toHaveAttribute(
       "href",
@@ -72,6 +92,9 @@ describe("responsive and accessible foundation primitives", () => {
     expect(screen.getByRole("link", { name: "Surveys" })).toHaveAttribute(
       "aria-current",
       "page",
+    );
+    expect(screen.getByRole("link", { name: "Surveys" })).toHaveClass(
+      "text-[var(--accent)]",
     );
     expect(screen.getByRole("link", { name: "Workspace" })).not.toHaveAttribute(
       "aria-current",

@@ -1,45 +1,14 @@
-import { z } from "zod";
-import type { NextRequest } from "next/server";
-import { parseJsonRequest } from "@/server/http/request-validation";
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
-import {
-  infrastructureError,
-  requireTrustedMutation,
-} from "@/server/modules/infrastructure/http";
+import { infrastructureError } from "@/server/modules/infrastructure/http";
 import { getInfrastructureService } from "@/server/modules/infrastructure/runtime";
 
 export const dynamic = "force-dynamic";
-const reconciliation = z
-  .object({
-    provider: z.enum(["NETLIFY", "COCKROACH", "BREVO"]),
-    quota: z.string().min(1).max(128),
-    period: z.string().min(1).max(64),
-    used: z.number().nonnegative(),
-    limit: z.number().positive(),
-    collectedAt: z.coerce.date(),
-  })
-  .strict();
-
 export async function GET() {
   try {
     const body = await getInfrastructureService().adminView(
       await getCurrentEmployee(),
     );
     return Response.json(body, { headers: privateHeaders() });
-  } catch (error) {
-    return infrastructureError(error);
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    requireTrustedMutation(request);
-    const input = await parseJsonRequest(request, reconciliation, 4_096);
-    await getInfrastructureService().reconcile(
-      await getCurrentEmployee(),
-      input,
-    );
-    return new Response(null, { status: 204, headers: privateHeaders() });
   } catch (error) {
     return infrastructureError(error);
   }

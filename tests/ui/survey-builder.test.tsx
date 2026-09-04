@@ -58,7 +58,7 @@ describe("survey builder UI", () => {
     const question = screen.getByRole("group", { name: "Question 1" });
     expect(
       within(question).getByRole("button", { name: "Add option" }),
-    ).toHaveClass("bg-emerald-700");
+    ).toHaveClass("ui-primary");
     expect(
       within(question).queryByRole("button", { name: /Move (up|down)/ }),
     ).not.toBeInTheDocument();
@@ -71,10 +71,10 @@ describe("survey builder UI", () => {
     );
     expect(
       within(finalActions).getByRole("button", { name: "Save Draft" }),
-    ).toHaveClass("bg-slate-200");
+    ).toHaveClass("ui-secondary");
     expect(
       within(finalActions).getByRole("button", { name: "Activate" }),
-    ).toBeInTheDocument();
+    ).toHaveClass("ui-primary");
     expect(container).toBeTruthy();
   });
 

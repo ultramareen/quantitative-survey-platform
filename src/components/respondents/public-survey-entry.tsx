@@ -13,6 +13,7 @@ import {
   purgePending,
   retainPending,
 } from "./pending-mutations";
+import { isCompletePhone } from "@/lib/phone-validation";
 
 const countries = [
   ["US", "United States (+1)"],
@@ -41,6 +42,8 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
   const [state, setState] = useState<PublicSurveyOpenResult>();
   const [message, setMessage] = useState<string>();
   const [busy, setBusy] = useState(false);
+  const [country, setCountry] = useState("RU");
+  const [phone, setPhone] = useState("");
   useEffect(() => {
     let active = true;
     fetch(`/api/public/surveys/${encodeURIComponent(publicId)}/open`, {
@@ -76,9 +79,13 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
   }, [publicId]);
   async function identify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setBusy(true);
     setMessage(undefined);
     const form = new FormData(event.currentTarget);
+    if (!isCompletePhone(phone, country)) {
+      setMessage("Enter a valid and complete phone number.");
+      return;
+    }
+    setBusy(true);
     const response = await fetch(
       `/api/public/surveys/${encodeURIComponent(publicId)}/identify`,
       {
@@ -86,8 +93,8 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           name: form.get("name"),
-          country: form.get("country"),
-          phone: form.get("phone"),
+          country,
+          phone,
         }),
       },
     );
@@ -104,7 +111,7 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
   if (!state)
     return (
       <section
-        className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10"
+        className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10"
         aria-live="polite"
       >
         <p>Opening survey…</p>
@@ -126,7 +133,7 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
       />
     );
   return (
-    <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
+    <section className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
       <p className="text-sm font-semibold tracking-wide text-blue-700 uppercase">
         Public survey
       </p>
@@ -153,7 +160,8 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
             <select
               className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-3"
               name="country"
-              defaultValue="RU"
+              onChange={(event) => setCountry(event.target.value)}
+              value={country}
             >
               {countries.map(([code, label]) => (
                 <option value={code} key={code}>
@@ -171,7 +179,19 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
               autoComplete="tel"
               inputMode="tel"
               maxLength={64}
+              onChange={(event) => setPhone(event.target.value)}
+              onKeyDown={(event) => {
+                if (
+                  /^\d$/.test(event.key) &&
+                  phone.trim().startsWith("+7") &&
+                  phone.replace(/\D/g, "").length >= 11 &&
+                  event.currentTarget.selectionStart ===
+                    event.currentTarget.selectionEnd
+                )
+                  event.preventDefault();
+              }}
               required
+              value={phone}
             />
           </label>
         </div>
@@ -336,12 +356,12 @@ function Questionnaire({ publicId }: { publicId: string }) {
     );
   if (submitted)
     return (
-      <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
+      <section className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
         <p>Thank you. Your response has been recorded.</p>
       </section>
     );
   return (
-    <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
+    <section className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
       <h1 className="text-2xl font-semibold">{attempt.title}</h1>
       {attempt.description ? (
         <p className="mt-3 text-slate-600">{attempt.description}</p>
@@ -388,7 +408,7 @@ function QuestionField({
   const heading = `${question.position}. ${question.prompt}`;
   if (question.type === "FREE_TEXT")
     return (
-      <label className="grid gap-2 font-medium">
+      <label className="respondent-question grid gap-2 font-medium">
         {heading}{" "}
         <span className="text-sm font-normal text-slate-500">
           {question.required ? "Required" : "Optional"}
@@ -408,7 +428,7 @@ function QuestionField({
       </label>
     );
   return (
-    <fieldset>
+    <fieldset className="respondent-question">
       <legend className="font-medium">
         {heading}{" "}
         <span className="text-sm font-normal text-slate-500">
@@ -455,7 +475,7 @@ function QuestionField({
 
 function Unavailable({ title, body }: { title: string; body: string }) {
   return (
-    <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
+    <section className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
       <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="mt-4 text-slate-600">{body}</p>
     </section>

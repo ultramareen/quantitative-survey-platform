@@ -97,50 +97,6 @@ export class PgInfrastructureRepository implements InfrastructureRepository {
     };
   }
 
-  async reconcile(input: {
-    provider: string;
-    quota: string;
-    period: string;
-    used: number;
-    limit: number;
-    collectedAt: Date;
-    actorId: string;
-  }) {
-    await this.transaction(async (client) => {
-      await client.query(
-        `INSERT INTO infrastructure_usage_snapshots
-          (id,provider,quota_key,period_key,used_units,limit_units,usage_percent,source,safe_details,collected_at,created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,'MANUAL_ACTUAL',$8,$9,now())`,
-        [
-          randomUUID(),
-          input.provider,
-          input.quota,
-          input.period,
-          input.used,
-          input.limit,
-          percent(input.used, input.limit),
-          JSON.stringify({ enteredFrom: "provider-dashboard" }),
-          input.collectedAt,
-        ],
-      );
-      await client.query(
-        `INSERT INTO audit_events
-          (id,actor_user_id,action,target_type,result,safe_metadata,created_at)
-         VALUES ($1,$2,'INFRASTRUCTURE_MANUAL_RECONCILIATION','InfrastructureUsage','SUCCESS',$3,now())`,
-        [
-          randomUUID(),
-          input.actorId,
-          JSON.stringify({
-            provider: input.provider,
-            quota: input.quota,
-            period: input.period,
-            source: "MANUAL_ACTUAL",
-          }),
-        ],
-      );
-    });
-  }
-
   async evaluate(now: Date): Promise<UsageReading[]> {
     const month = periodMonth(now);
     const day = periodDay(now);

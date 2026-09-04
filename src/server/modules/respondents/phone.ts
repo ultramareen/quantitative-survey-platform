@@ -1,21 +1,12 @@
 import "server-only";
 
-import {
-  parsePhoneNumberFromString,
-  type CountryCode,
-} from "libphonenumber-js";
 import { AppError } from "@/server/errors/app-error";
-
-const COUNTRY_PATTERN = /^[A-Z]{2}$/;
+import { normalizedPhoneOrNull } from "@/lib/phone-validation";
 
 export function normalizePhone(phone: string, country: string): string {
-  const raw = phone.trim();
-  const countryCode = country.trim().toUpperCase();
-  if (!raw || raw.length > 64 || !COUNTRY_PATTERN.test(countryCode))
-    throw invalid();
-  const parsed = parsePhoneNumberFromString(raw, countryCode as CountryCode);
-  if (!parsed?.isValid()) throw invalid();
-  return parsed.number;
+  const normalized = normalizedPhoneOrNull(phone, country);
+  if (!normalized) throw invalid();
+  return normalized;
 }
 
 function invalid() {
