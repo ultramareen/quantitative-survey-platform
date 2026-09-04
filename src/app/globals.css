@@ -267,4 +267,44 @@ input[type="radio"]:not(:disabled) {
   .ui-muted {
     color: var(--muted);
   }
+
+  .respondent-theme {
+    --background: #ffffff;
+    --surface: #ffffff;
+    --surface-raised: #f4f4f4;
+    --surface-subtle: #fafafa;
+    --foreground: #171717;
+    --muted: #666666;
+    --muted-strong: #454545;
+    --accent: var(--success);
+    --accent-foreground: #171717;
+    --border: #a8a8a8;
+
+    min-height: 100vh;
+    background: var(--background);
+    color: var(--foreground);
+    color-scheme: light;
+  }
+
+  .respondent-theme h1 {
+    color: var(--foreground);
+  }
+
+  .respondent-theme input,
+  .respondent-theme select,
+  .respondent-theme textarea {
+    color-scheme: light;
+  }
+
+  .respondent-panel {
+    border-color: #d1d1d1;
+    background: var(--surface);
+  }
+
+  .respondent-question {
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--surface-subtle);
+    padding: 1.25rem;
+  }
 }

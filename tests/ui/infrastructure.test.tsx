@@ -10,6 +10,16 @@ describe("Phase 12 infrastructure UI", () => {
     expect(styles).toContain("accent-color: var(--accent)");
   });
 
+  it("defines an isolated light respondent design system", () => {
+    const styles = readFileSync("src/app/globals.css", "utf8");
+    const respondentTheme = styles.slice(styles.indexOf(".respondent-theme"));
+    expect(respondentTheme).toContain("--background: #ffffff");
+    expect(respondentTheme).toContain("--foreground: #171717");
+    expect(respondentTheme).toContain("--accent: var(--success)");
+    expect(respondentTheme).toContain("color-scheme: light");
+    expect(respondentTheme).toContain(".respondent-question");
+  });
+
   it("keeps quota and capacity concepts out of the ordinary Admin UI", () => {
     const adminPage = readFileSync(
       "src/app/(internal)/app/admin/page.tsx",

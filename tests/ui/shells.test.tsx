@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { InternalShell } from "@/components/layout/internal-shell";
 import { PublicShell } from "@/components/layout/public-shell";
+import SurveyLayout from "@/app/(public)/survey/[publicId]/layout";
 import { FormField } from "@/components/ui/form-field";
 import { LoadingState } from "@/components/ui/loading-state";
 
@@ -38,6 +39,19 @@ describe("responsive and accessible foundation primitives", () => {
     expect(
       screen.getByRole("link", { name: "Quantitative Survey Platform" }),
     ).toHaveAttribute("href", "/");
+  });
+
+  it("scopes public surveys to the separate respondent theme", () => {
+    const { container } = render(
+      <SurveyLayout>
+        <h1>Respondent content</h1>
+      </SurveyLayout>,
+    );
+
+    expect(container.firstElementChild).toHaveClass("respondent-theme");
+    expect(
+      screen.getByRole("heading", { name: "Respondent content" }),
+    ).toBeInTheDocument();
   });
 
   it("renders semantic internal navigation with responsive layout classes", () => {
