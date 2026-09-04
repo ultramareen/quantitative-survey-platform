@@ -325,7 +325,7 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Tests / verification performed:** Added a focused source-level UI boundary test proving Administration retains Manage employees while the Admin page and shared layout contain no quota, capacity, usage, or infrastructure presentation. The same test proves scheduled evaluation and the 95% enforcement call remain connected. Full local results are recorded with the implementation commit.
 - **Verification limitation:** Netlify usage is currently estimated from application-observed request, sampled compute/bandwidth, static-asset multiplier, and recorded production-deployment data; the application does not fetch live account-wide Netlify credit consumption. Manual/provider snapshots can override estimates when present, but missing or stale authoritative data means the 95% safeguard cannot reliably detect the real Netlify account threshold by itself.
 - **Production verification status:** Local implementation only. No Netlify build, Deploy Preview rebuild, production deploy, provider configuration change, or production mutation was performed.
-- **Relevant commit:** Pending local implementation commit.
+- **Relevant commit:** `78390d45b2965eec17424ec6363729d3bd1f1929`
 
 ## QA-024
 
@@ -339,4 +339,4 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Implementation summary:** Introduced shared graphite/yellow, surface, border, text, danger, success, and warning tokens plus reusable primary, secondary, danger, input, card, link, kicker, and muted component styles. Applied the tokens across existing utility-backed surfaces and feedback, moved former blue/green primary actions to yellow, retained semantic danger/success treatments, and made the desktop sidebar sticky with independent vertical overflow.
 - **Tests / verification performed:** Added layout assertions for desktop sticky positioning, internal sidebar overflow, and yellow route-active navigation while retaining existing responsive, semantic-landmark, label/error, loading-announcement, and route-aware tests. Full local results are recorded with the implementation commit.
 - **Production verification status:** Local implementation only. The current Deploy Preview remains unchanged pending a later consolidated deployment.
-- **Relevant commit:** Pending local implementation commit.
+- **Relevant commit:** `78390d45b2965eec17424ec6363729d3bd1f1929`
