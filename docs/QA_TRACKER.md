@@ -340,3 +340,17 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Tests / verification performed:** Added layout assertions for desktop sticky positioning, internal sidebar overflow, and yellow route-active navigation while retaining existing responsive, semantic-landmark, label/error, loading-announcement, and route-aware tests. Full local results are recorded with the implementation commit.
 - **Production verification status:** Local implementation only. The current Deploy Preview remains unchanged pending a later consolidated deployment.
 - **Relevant commit:** `78390d45b2965eec17424ec6363729d3bd1f1929`
+
+## QA-025
+
+- **ID:** QA-025
+- **Date reported:** 2026-09-04
+- **Area / screen:** Public respondent survey / visual theme separation
+- **Original user-reported problem:** The approved graphite/yellow authenticated product theme unintentionally carried into the respondent-facing survey and completion experience.
+- **Expected behaviour / acceptance criteria:** Keep graphite/yellow unchanged for authenticated product screens. Public survey identification, questionnaire, question blocks, controls, validation, submission, unavailable states, and successful completion use an explicitly isolated light theme: white page and panels, near-black primary text, restrained grey question borders, and the existing semantic green for primary/focus/selected interactions. Completion copy and all survey behavior remain unchanged.
+- **Status:** Fixed — awaiting Deploy Preview verification
+- **Root cause:** Global theme tokens applied at the document root, while the public survey route had no route-level theme boundary of its own.
+- **Implementation summary:** Added a respondent-only route theme boundary with independent light surface, text, border, and interaction tokens. Public survey panels and reusable question containers receive semantic respondent classes; the internal product token values and authenticated components are unchanged.
+- **Tests / verification performed:** Added coverage for the route-level respondent theme boundary, exact white/near-black token values, reuse of the semantic success token, light color scheme, and shared question-block style. Existing public survey interaction tests continue to cover identification, controls, validation, autosave, submission, and exact completion copy.
+- **Production verification status:** Local implementation only. No Netlify build, Deploy Preview rebuild, push, merge, production deploy, or production mutation was performed.
+- **Relevant commit:** Pending local implementation commit.

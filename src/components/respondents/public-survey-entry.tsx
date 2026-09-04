@@ -111,7 +111,7 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
   if (!state)
     return (
       <section
-        className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10"
+        className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10"
         aria-live="polite"
       >
         <p>Opening survey…</p>
@@ -133,7 +133,7 @@ export function PublicSurveyEntry({ publicId }: { publicId: string }) {
       />
     );
   return (
-    <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
+    <section className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
       <p className="text-sm font-semibold tracking-wide text-blue-700 uppercase">
         Public survey
       </p>
@@ -356,12 +356,12 @@ function Questionnaire({ publicId }: { publicId: string }) {
     );
   if (submitted)
     return (
-      <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
+      <section className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
         <p>Thank you. Your response has been recorded.</p>
       </section>
     );
   return (
-    <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
+    <section className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
       <h1 className="text-2xl font-semibold">{attempt.title}</h1>
       {attempt.description ? (
         <p className="mt-3 text-slate-600">{attempt.description}</p>
@@ -408,7 +408,7 @@ function QuestionField({
   const heading = `${question.position}. ${question.prompt}`;
   if (question.type === "FREE_TEXT")
     return (
-      <label className="grid gap-2 font-medium">
+      <label className="respondent-question grid gap-2 font-medium">
         {heading}{" "}
         <span className="text-sm font-normal text-slate-500">
           {question.required ? "Required" : "Optional"}
@@ -428,7 +428,7 @@ function QuestionField({
       </label>
     );
   return (
-    <fieldset>
+    <fieldset className="respondent-question">
       <legend className="font-medium">
         {heading}{" "}
         <span className="text-sm font-normal text-slate-500">
@@ -475,7 +475,7 @@ function QuestionField({
 
 function Unavailable({ title, body }: { title: string; body: string }) {
   return (
-    <section className="rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
+    <section className="respondent-panel rounded-2xl border bg-white p-6 shadow-sm sm:p-10">
       <h1 className="text-2xl font-semibold">{title}</h1>
       <p className="mt-4 text-slate-600">{body}</p>
     </section>
