@@ -16,20 +16,25 @@ export function InternalShell({
       href === "/app"
         ? pathname === href
         : pathname === href || pathname.startsWith(`${href}/`);
-    return `rounded-md px-3 py-2 text-sm ${
-      active ? "bg-slate-800 text-white" : "text-slate-300 hover:bg-slate-900"
+    return `rounded-md border-l-2 px-3 py-2 text-sm ${
+      active
+        ? "border-[var(--accent)] bg-[var(--surface-raised)] text-[var(--accent)]"
+        : "border-transparent text-[var(--muted-strong)] hover:bg-[var(--surface-raised)] hover:text-[var(--foreground)]"
     }`;
   };
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr]">
+    <div className="min-h-screen lg:grid lg:grid-cols-[16rem_1fr] lg:items-start">
       <a
-        className="sr-only z-50 rounded bg-white px-4 py-2 text-slate-950 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+        className="ui-primary sr-only z-50 px-4 py-2 focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
         href="#main-content"
       >
         Skip to main content
       </a>
-      <aside className="border-b border-slate-800 bg-slate-950 px-4 py-4 text-white lg:min-h-screen lg:border-r lg:border-b-0 lg:px-6 lg:py-8">
-        <Link className="font-semibold tracking-tight" href="/app">
+      <aside className="border-b border-[var(--border)] bg-[var(--surface-subtle)] px-4 py-4 lg:sticky lg:top-0 lg:h-screen lg:self-start lg:overflow-y-auto lg:border-r lg:border-b-0 lg:px-6 lg:py-8">
+        <Link
+          className="font-semibold tracking-tight text-[var(--accent)]"
+          href="/app"
+        >
           Survey Platform
         </Link>
         <nav
@@ -76,7 +81,7 @@ export function InternalShell({
           ) : null}
           <LogoutButton />
         </nav>
-        <p className="mt-8 text-xs text-slate-400">
+        <p className="mt-8 text-xs text-[var(--muted)]">
           {employee.displayName}
           <br />
           {employee.role.replaceAll("_", " ")}

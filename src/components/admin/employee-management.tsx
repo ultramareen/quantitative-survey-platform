@@ -177,6 +177,7 @@ export function EmployeeManagement({
                       {row.status === "INVITED" && row.invitationId ? (
                         <>
                           <button
+                            className="ui-secondary px-3 py-2"
                             disabled={busy}
                             onClick={() =>
                               mutate(
@@ -190,6 +191,7 @@ export function EmployeeManagement({
                             Resend invitation
                           </button>
                           <button
+                            className="ui-danger px-3 py-2"
                             disabled={busy}
                             onClick={() => {
                               if (
@@ -211,6 +213,7 @@ export function EmployeeManagement({
                       ) : null}
                       {row.userId && !row.disabledAt ? (
                         <button
+                          className="ui-danger px-3 py-2"
                           disabled={busy || isLastActiveAdmin}
                           title={
                             isLastActiveAdmin
@@ -236,6 +239,7 @@ export function EmployeeManagement({
                       ) : null}
                       {row.userId && row.disabledAt ? (
                         <button
+                          className="ui-secondary px-3 py-2"
                           disabled={busy}
                           onClick={() =>
                             mutate(

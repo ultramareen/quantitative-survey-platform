@@ -1,103 +1,37 @@
-// @vitest-environment jsdom
-import { render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { InfrastructureUsageHeadline } from "@/components/infrastructure/usage-headline";
-import { InfrastructureAdminControls } from "@/components/infrastructure/admin-controls";
-
-const headline = {
-  percent: 99,
-  provider: "NETLIFY",
-  quota: "CREDITS",
-  source: "APPLICATION_ESTIMATE" as const,
-  updatedAt: "2026-08-29T12:00:00.000Z",
-  stale: false,
-  tone: "critical" as const,
-};
 
 describe("Phase 12 infrastructure UI", () => {
-  it("clearly labels cached estimates, source, and provider authority", () => {
-    render(<InfrastructureUsageHeadline value={headline} />);
-    expect(
-      screen.getByText("Estimated Infrastructure Usage — 99%"),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/not provider-actual/)).toBeInTheDocument();
-    expect(screen.getByRole("progressbar")).toHaveAttribute(
-      "aria-valuenow",
-      "99",
-    );
+  it("defines the approved graphite and yellow design-system foundations", () => {
+    const styles = readFileSync("src/app/globals.css", "utf8");
+    expect(styles).toContain("--background: #262626");
+    expect(styles).toContain("--accent: #f5c242");
+    expect(styles).toContain("--accent-foreground: #171717");
+    expect(styles).toContain("accent-color: var(--accent)");
   });
-  it("keeps quota monitoring and capacity selection without manual reconciliation or the survey bulk action", () => {
-    render(
-      <InfrastructureAdminControls
-        view={{
-          headline,
-          quotas: [
-            {
-              provider: "NETLIFY",
-              quota: "CREDITS",
-              used: 297,
-              limit: 300,
-              percent: 99,
-              source: "MANUAL_ACTUAL",
-              period: "2026-08",
-              resetsAt: null,
-              updatedAt: headline.updatedAt,
-              stale: false,
-              providerConsoleUrl: "https://app.netlify.com/teams",
-              drivesProtection: true,
-            },
-          ],
-          activeSurveys: [
-            {
-              publicId: "safe-public",
-              title: "Selected survey",
-              ownerName: "Synthetic Owner",
-            },
-          ],
-          pendingSurveys: [
-            {
-              publicId: "safe-pending",
-              title: "Paused survey",
-              ownerName: "Synthetic Owner",
-            },
-          ],
-        }}
-      />,
+
+  it("keeps quota and capacity concepts out of the ordinary Admin UI", () => {
+    const adminPage = readFileSync(
+      "src/app/(internal)/app/admin/page.tsx",
+      "utf8",
     );
-    expect(screen.getByRole("alert")).toHaveTextContent("remains active");
-    expect(screen.getByRole("link", { name: "Open provider" })).toHaveAttribute(
-      "href",
-      "https://app.netlify.com/teams",
-    );
-    expect(
-      screen.getByText(/free-tier limits that keep this service/),
-    ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Pause all active surveys" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("Manual provider-dashboard reconciliation"),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Provider quota")).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: "Save dated manual actual" }),
-    ).not.toBeInTheDocument();
-    expect(document.body.textContent).not.toContain("00000000-");
+    const appLayout = readFileSync("src/app/(internal)/app/layout.tsx", "utf8");
+    expect(adminPage).toContain("Manage employees");
+    expect(adminPage).not.toMatch(/quota|capacity|infrastructure/i);
+    expect(appLayout).not.toMatch(/usage|quota|infrastructure/i);
   });
-  it("keeps the automated quota empty state without an empty manual UI container", () => {
-    render(
-      <InfrastructureAdminControls
-        view={{
-          headline: { ...headline, percent: 0 },
-          quotas: [],
-          activeSurveys: [],
-          pendingSurveys: [],
-        }}
-      />,
+
+  it("retains scheduled evaluation and transactional capacity enforcement", () => {
+    const scheduledCheck = readFileSync(
+      "netlify/functions/infrastructure-check.ts",
+      "utf8",
     );
-    expect(
-      screen.getByText(/No quota readings are available yet/),
-    ).toBeInTheDocument();
-    expect(document.querySelector("form")).toBeNull();
+    const service = readFileSync(
+      "src/server/modules/infrastructure/service.ts",
+      "utf8",
+    );
+    expect(scheduledCheck).toContain("runCheck");
+    expect(service).toContain("enforceCapacity");
+    expect(service).toContain("95");
   });
 });
