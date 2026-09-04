@@ -311,3 +311,32 @@ Allowed statuses: **Reported**, **In Progress**, **Fixed — awaiting production
 - **Tests / verification performed:** Added UI coverage for disabled sole-Admin removal controls and both explanations. Database integration covers sole-Admin deactivation and demotion rejection, unchanged role/status/authorization version after failure, allowed deactivation and demotion with two Admins, and simultaneous deactivation/demotion yielding one success and one rejection with exactly one active Admin remaining. Both deterministic fresh-database runs passed all 56 integration tests; the full 258-test application suite and all requested local quality/security/artifact gates passed.
 - **Production verification status:** Not deployed; local and synthetic database verification only. No production Admin, user, invitation, role, or record was touched.
 - **Relevant commit:** `909a734fc9eb8e6b49d5efbc5326dfe07dc9093d`
+
+## QA-023
+
+- **ID:** QA-023
+- **Date reported:** 2026-09-04
+- **Area / screen:** Administration / product-facing navigation
+- **Original user-reported problem:** The Administration area exposed provider quota detail and capacity controls that were confusing and not useful to an ordinary product Admin.
+- **Expected behaviour / acceptance criteria:** Administration focuses on employee management. Provider quota detail, capacity controls, usage indicators, provider links, selectors, actions, explanatory copy, empty states, and the global infrastructure-usage headline are not rendered in the product UI. Independent automated backend safeguards remain intact and are not presented as provider-authoritative monitoring.
+- **Status:** Fixed — awaiting Deploy Preview verification
+- **Root cause:** The original operations-oriented infrastructure controls were mounted directly in the product Admin page, and an estimated usage headline was mounted in the shared authenticated layout.
+- **Implementation summary:** Reduced Administration to an intentional employee-management entry point and removed the infrastructure Admin controls, usage headline, and their page wrapper. The scheduled infrastructure evaluation, estimates, snapshots, alert thresholds, enforcement service, transactional survey protection, and Admin survey lifecycle actions remain unchanged.
+- **Tests / verification performed:** Added a focused source-level UI boundary test proving Administration retains Manage employees while the Admin page and shared layout contain no quota, capacity, usage, or infrastructure presentation. The same test proves scheduled evaluation and the 95% enforcement call remain connected. Full local results are recorded with the implementation commit.
+- **Verification limitation:** Netlify usage is currently estimated from application-observed request, sampled compute/bandwidth, static-asset multiplier, and recorded production-deployment data; the application does not fetch live account-wide Netlify credit consumption. Manual/provider snapshots can override estimates when present, but missing or stale authoritative data means the 95% safeguard cannot reliably detect the real Netlify account threshold by itself.
+- **Production verification status:** Local implementation only. No Netlify build, Deploy Preview rebuild, production deploy, provider configuration change, or production mutation was performed.
+- **Relevant commit:** Pending local implementation commit.
+
+## QA-024
+
+- **ID:** QA-024
+- **Date reported:** 2026-09-04
+- **Area / screen:** Global UI / visual design system
+- **Original user-reported problem:** The application used a light slate/blue visual system and the desktop sidebar scrolled away on long pages rather than remaining available.
+- **Expected behaviour / acceptance criteria:** Apply a cohesive dark graphite theme using exact base tokens `#262626` (background), `#F5C242` (primary/active/focus), and `#171717` (text on yellow). Use restrained graphite surfaces, readable grey text, yellow primary actions, grey secondary actions, red only for danger/error, and green only for success. Forms, tables, cards, badges, validation, and feedback retain clear accessible states. The desktop sidebar remains viewport-sticky with its own overflow while responsive mobile navigation and route-aware active state remain intact. Existing workflows and semantics do not change.
+- **Status:** Fixed — awaiting Deploy Preview verification
+- **Root cause:** Colors were expressed as repeated light-theme utility classes without a shared semantic graphite/yellow token layer, and the desktop sidebar used only a minimum height rather than viewport-sticky positioning.
+- **Implementation summary:** Introduced shared graphite/yellow, surface, border, text, danger, success, and warning tokens plus reusable primary, secondary, danger, input, card, link, kicker, and muted component styles. Applied the tokens across existing utility-backed surfaces and feedback, moved former blue/green primary actions to yellow, retained semantic danger/success treatments, and made the desktop sidebar sticky with independent vertical overflow.
+- **Tests / verification performed:** Added layout assertions for desktop sticky positioning, internal sidebar overflow, and yellow route-active navigation while retaining existing responsive, semantic-landmark, label/error, loading-announcement, and route-aware tests. Full local results are recorded with the implementation commit.
+- **Production verification status:** Local implementation only. The current Deploy Preview remains unchanged pending a later consolidated deployment.
+- **Relevant commit:** Pending local implementation commit.

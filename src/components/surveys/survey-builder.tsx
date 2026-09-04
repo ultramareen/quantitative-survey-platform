@@ -407,7 +407,7 @@ export function SurveyBuilder({
                       options: [...question.options, ""],
                     })
                   }
-                  className="rounded-md bg-emerald-700 px-3 py-1.5 text-white disabled:opacity-50"
+                  className="ui-primary px-3 py-1.5 disabled:opacity-50"
                 >
                   Add option
                 </button>
@@ -430,7 +430,7 @@ export function SurveyBuilder({
           type="button"
           disabled={questions.length >= 50}
           onClick={() => setQuestions((v) => [...v, blankQuestion()])}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2 font-medium disabled:opacity-50"
+          className="ui-primary px-4 py-2 disabled:opacity-50"
         >
           Add question
         </button>
@@ -447,12 +447,12 @@ export function SurveyBuilder({
       >
         <button
           disabled={busy}
-          className="rounded-lg bg-slate-200 px-5 py-3 font-medium text-slate-900 disabled:opacity-50"
+          className="ui-secondary px-5 py-3 font-medium disabled:opacity-50"
         >
           {operation === "save" ? "Saving…" : "Save Draft"}
         </button>
         <button
-          className="rounded-lg bg-emerald-700 px-5 py-3 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+          className="ui-primary px-5 py-3 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={busy || !activationReady}
           onClick={() => void activate()}
           title={

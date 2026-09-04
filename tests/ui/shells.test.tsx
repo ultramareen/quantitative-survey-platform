@@ -55,6 +55,12 @@ describe("responsive and accessible foundation primitives", () => {
     ).toBeInTheDocument();
     expect(container.firstElementChild).toHaveClass("lg:grid");
     expect(screen.getByRole("navigation")).toHaveClass("flex-wrap");
+    expect(container.querySelector("aside")).toHaveClass(
+      "lg:sticky",
+      "lg:top-0",
+      "lg:h-screen",
+      "lg:overflow-y-auto",
+    );
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Respondents" })).toHaveAttribute(
       "href",
@@ -72,6 +78,9 @@ describe("responsive and accessible foundation primitives", () => {
     expect(screen.getByRole("link", { name: "Surveys" })).toHaveAttribute(
       "aria-current",
       "page",
+    );
+    expect(screen.getByRole("link", { name: "Surveys" })).toHaveClass(
+      "text-[var(--accent)]",
     );
     expect(screen.getByRole("link", { name: "Workspace" })).not.toHaveAttribute(
       "aria-current",

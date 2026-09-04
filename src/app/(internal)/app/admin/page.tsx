@@ -1,12 +1,9 @@
 import Link from "next/link";
 
-import { StatusBadge } from "@/components/ui/status-badge";
 import { redirect } from "next/navigation";
 
 import { getCurrentEmployee } from "@/server/modules/auth/current-employee";
 import { requireRole } from "@/server/modules/auth/policies";
-import { getInfrastructureService } from "@/server/modules/infrastructure/runtime";
-import { AdminInfrastructurePage } from "./infrastructure-view";
 
 export default async function AdminFoundationPage() {
   const employee = await getCurrentEmployee();
@@ -15,27 +12,26 @@ export default async function AdminFoundationPage() {
   } catch {
     redirect("/app?error=forbidden");
   }
-  const infrastructure = await getInfrastructureService().adminView(employee);
   return (
     <section aria-labelledby="admin-heading">
-      <StatusBadge label="Admin authorized" tone="warning" />
+      <p className="ui-kicker text-sm font-semibold tracking-wide uppercase">
+        Administration
+      </p>
       <h1
         id="admin-heading"
-        className="mt-4 text-3xl font-semibold tracking-tight"
+        className="mt-2 text-3xl font-semibold tracking-tight"
       >
-        Administration shell
+        Manage your team
       </h1>
-      <p className="mt-3 max-w-2xl leading-7 text-slate-600">
-        Server-side authorization confirmed the Admin role. Employee invitation,
-        role, lifecycle, and infrastructure capacity controls are available.
+      <p className="ui-muted mt-3 max-w-2xl leading-7">
+        Invite employees and manage their roles and access in one place.
       </p>
       <Link
-        className="mt-6 inline-block rounded-lg bg-blue-700 px-4 py-3 font-medium text-white"
+        className="ui-primary mt-6 inline-block px-4 py-3"
         href="/app/admin/employees"
       >
         Manage employees
       </Link>
-      <AdminInfrastructurePage view={infrastructure} />
     </section>
   );
 }

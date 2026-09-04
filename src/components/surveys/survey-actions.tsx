@@ -83,14 +83,14 @@ export function SurveyActions({
         <>
           <button
             disabled={busy}
-            className="rounded-lg border px-4 py-2"
+            className="ui-secondary px-4 py-2"
             onClick={() => transition("PENDING_CAPACITY")}
           >
             Pause
           </button>
           <button
             disabled={busy}
-            className="rounded-lg border border-red-300 px-4 py-2 text-red-800"
+            className="ui-danger px-4 py-2"
             onClick={() => transition("COMPLETED")}
           >
             Complete permanently
@@ -101,14 +101,14 @@ export function SurveyActions({
         <>
           <button
             disabled={busy}
-            className="rounded-lg bg-emerald-700 px-4 py-2 text-white"
+            className="ui-primary px-4 py-2"
             onClick={() => transition("ACTIVE")}
           >
             Reactivate
           </button>
           <button
             disabled={busy}
-            className="rounded-lg border border-red-300 px-4 py-2 text-red-800"
+            className="ui-danger px-4 py-2"
             onClick={() => transition("COMPLETED")}
           >
             Complete permanently
@@ -117,7 +117,7 @@ export function SurveyActions({
       ) : null}
       <button
         disabled={busy}
-        className="rounded-lg border px-4 py-2"
+        className="ui-secondary px-4 py-2"
         onClick={() => act({ action: "duplicate" })}
       >
         {operation === "Duplicating survey…"
@@ -127,7 +127,7 @@ export function SurveyActions({
       {employee.role === "ADMIN" ? (
         <button
           disabled={busy}
-          className="rounded-lg border px-4 py-2 text-red-700"
+          className="ui-danger px-4 py-2"
           onClick={remove}
         >
           Delete / tombstone
