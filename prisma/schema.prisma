@@ -246,6 +246,7 @@ model AnswerOption {
 
   @@unique([questionId, position], map: "answer_options_question_id_position_key")
   @@index([surveyId], map: "answer_options_survey_id_idx")
+  @@index([surveyId, branchDestinationQuestionId], map: "answer_options_branch_destination_idx")
   @@map("answer_options")
 }
 
