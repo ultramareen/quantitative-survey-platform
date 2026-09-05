@@ -113,6 +113,12 @@ export function normalizeDraft(input: SurveyDraftInput): SurveyDraftInput {
     throw bad("Survey description cannot exceed 4000 characters.");
   if (!Array.isArray(input.questions) || input.questions.length > 50)
     throw bad("A survey can contain at most 50 questions.");
+  const questionIds = new Set(input.questions.map((question) => question.id));
+  if (questionIds.size !== input.questions.length)
+    throw bad("Question IDs must be unique.");
+  const positions = new Map(
+    input.questions.map((question, index) => [question.id, index]),
+  );
   return {
     title,
     description,
@@ -130,19 +136,39 @@ export function normalizeDraft(input: SurveyDraftInput): SurveyDraftInput {
         throw bad(
           `Question ${index + 1} can contain at most 11 answer options.`,
         );
+      const optionIds = new Set(question.options.map((option) => option.id));
+      if (optionIds.size !== question.options.length)
+        throw bad(`Answer option IDs in question ${index + 1} must be unique.`);
       const options = question.options.map((value, optionIndex) => {
-        const label = value.trim();
+        const label = value.label.trim();
         if (!label || label.length > 1000)
           throw bad(
             `Option ${optionIndex + 1} in question ${index + 1} is invalid.`,
           );
-        return label;
+        if (
+          question.type !== "SINGLE_CHOICE" &&
+          value.destination.type !== "NEXT"
+        )
+          throw bad(`Only single-choice question ${index + 1} can branch.`);
+        if (value.destination.type === "QUESTION") {
+          const target = positions.get(value.destination.questionId);
+          if (target === undefined)
+            throw bad(
+              `Branch in question ${index + 1} references a missing question.`,
+            );
+          if (target <= index)
+            throw bad(
+              `Branch in question ${index + 1} must point to a later question.`,
+            );
+        }
+        return { id: value.id, label, destination: value.destination };
       });
       if (question.type === "FREE_TEXT" && options.length !== 0)
         throw bad(
           `Free-text question ${index + 1} cannot have answer options.`,
         );
       return {
+        id: question.id,
         prompt,
         type: question.type,
         required: question.required,

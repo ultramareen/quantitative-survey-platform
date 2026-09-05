@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SurveyRepository } from "@/server/modules/surveys/repository";
+import { duplicateQuestionnaire } from "@/server/modules/surveys/repository";
 import {
   normalizeDraft,
   SurveyService,
@@ -19,17 +20,29 @@ const other = { ...owner, id: "other" };
 const researcher = { ...owner, id: "researcher", role: "RESEARCHER" as const };
 const admin = { ...owner, id: "admin", role: "ADMIN" as const };
 const adminOwner = { ...admin, id: "owner" };
+const option = (id: string, label: string) => ({
+  id,
+  label,
+  destination: { type: "NEXT" as const },
+});
 const valid: SurveyDraftInput = {
   title: "Study",
   description: "Description",
   questions: [
     {
+      id: "q1",
       prompt: "Choose",
       type: "SINGLE_CHOICE",
       required: true,
-      options: ["A", "B"],
+      options: [option("o1", "A"), option("o2", "B")],
     },
-    { prompt: "Explain", type: "FREE_TEXT", required: false, options: [] },
+    {
+      id: "q2",
+      prompt: "Explain",
+      type: "FREE_TEXT",
+      required: false,
+      options: [],
+    },
   ],
 };
 const detail: SurveyDetail = {
@@ -90,17 +103,30 @@ describe("survey builder validation", () => {
   it("accepts 50 questions and rejects 51", () => {
     const question = valid.questions[1]!;
     expect(
-      normalizeDraft({ ...valid, questions: Array(50).fill(question) })
-        .questions,
+      normalizeDraft({
+        ...valid,
+        questions: Array.from({ length: 50 }, (_, index) => ({
+          ...question,
+          id: `free-${index}`,
+        })),
+      }).questions,
     ).toHaveLength(50);
     expect(() =>
-      normalizeDraft({ ...valid, questions: Array(51).fill(question) }),
+      normalizeDraft({
+        ...valid,
+        questions: Array.from({ length: 51 }, (_, index) => ({
+          ...question,
+          id: `free-${index}`,
+        })),
+      }),
     ).toThrow("at most 50");
   });
   it("accepts 11 options and rejects 12", () => {
     const choice = {
       ...valid.questions[0]!,
-      options: Array(11).fill("Option"),
+      options: Array.from({ length: 11 }, (_, index) =>
+        option(`many-${index}`, "Option"),
+      ),
     };
     expect(
       normalizeDraft({ ...valid, questions: [choice] }).questions[0]?.options,
@@ -108,7 +134,14 @@ describe("survey builder validation", () => {
     expect(() =>
       normalizeDraft({
         ...valid,
-        questions: [{ ...choice, options: Array(12).fill("Option") }],
+        questions: [
+          {
+            ...choice,
+            options: Array.from({ length: 12 }, (_, index) =>
+              option(`too-many-${index}`, "Option"),
+            ),
+          },
+        ],
       }),
     ).toThrow("at most 11");
   });
@@ -117,23 +150,78 @@ describe("survey builder validation", () => {
     expect(() =>
       normalizeDraft({
         ...valid,
-        questions: [{ ...valid.questions[1]!, options: ["No"] }],
+        questions: [
+          { ...valid.questions[1]!, options: [option("bad-free", "No")] },
+        ],
       }),
     ).toThrow("cannot have");
     expect(() =>
       normalizeDraft({
         ...valid,
-        questions: [{ ...valid.questions[0]!, options: [""] }],
+        questions: [{ ...valid.questions[0]!, options: [option("empty", "")] }],
       }),
     ).toThrow("invalid");
   });
   it("requires 1–50 valid questions and 2–11 choice options at activation", () => {
     expect(() => validateActivation([])).toThrow("between 1 and 50");
     expect(() =>
-      validateActivation([{ ...valid.questions[0]!, options: ["A"] }]),
+      validateActivation([
+        { ...valid.questions[0]!, options: [option("one", "A")] },
+      ]),
     ).toThrow("between 2 and 11");
     expect(() => validateActivation([valid.questions[1]!])).not.toThrow();
     expect(() => validateActivation(valid.questions)).not.toThrow();
+  });
+  it("accepts forward and End branches but rejects backward and missing destinations", () => {
+    const forward = structuredClone(valid);
+    forward.questions[0]!.options[0]!.destination = {
+      type: "QUESTION",
+      questionId: "q2",
+    };
+    forward.questions[0]!.options[1]!.destination = { type: "END" };
+    expect(() => normalizeDraft(forward)).not.toThrow();
+
+    const backward = structuredClone(valid);
+    backward.questions[1] = {
+      id: "q2",
+      prompt: "Second choice",
+      type: "SINGLE_CHOICE",
+      required: false,
+      options: [
+        {
+          ...option("back-1", "Back"),
+          destination: { type: "QUESTION", questionId: "q1" },
+        },
+        option("back-2", "Next"),
+      ],
+    };
+    expect(() => normalizeDraft(backward)).toThrow("later question");
+
+    const missing = structuredClone(valid);
+    missing.questions[0]!.options[0]!.destination = {
+      type: "QUESTION",
+      questionId: "missing",
+    };
+    expect(() => normalizeDraft(missing)).toThrow("missing question");
+  });
+  it("rejects branching on non-single-choice questions", () => {
+    const malformed = structuredClone(valid);
+    malformed.questions[0]!.type = "MULTIPLE_CHOICE";
+    malformed.questions[0]!.options[0]!.destination = { type: "END" };
+    expect(() => normalizeDraft(malformed)).toThrow("Only single-choice");
+  });
+  it("copies branching while remapping stable IDs for a duplicated Draft", () => {
+    const source = structuredClone(detail.questions);
+    source[0]!.options[0]!.destination = {
+      type: "QUESTION",
+      questionId: source[1]!.id,
+    };
+    const copy = duplicateQuestionnaire(source);
+    expect(copy[0]!.id).not.toBe(source[0]!.id);
+    expect(copy[0]!.options[0]!.destination).toEqual({
+      type: "QUESTION",
+      questionId: copy[1]!.id,
+    });
   });
 });
 

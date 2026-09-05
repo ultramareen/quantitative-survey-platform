@@ -135,6 +135,6 @@ describe("module boundaries", () => {
     const migrations = (await readdir(join(root, "prisma", "migrations")))
       .filter((name) => /^\d{12}_/.test(name))
       .sort();
-    expect(migrations).toHaveLength(10);
+    expect(migrations).toHaveLength(11);
   });
 });

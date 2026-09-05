@@ -28,13 +28,21 @@ const attempt: PublicAttemptState = {
   recorded: false,
   questions: [
     {
+      id: "q1",
       position: 1,
       prompt: "Single choice",
       required: true,
       type: "SINGLE_CHOICE",
-      options: [{ position: 1, label: "Single-line answer" }],
+      options: [
+        {
+          position: 1,
+          label: "Single-line answer",
+          destination: { type: "NEXT" },
+        },
+      ],
     },
     {
+      id: "q2",
       position: 2,
       prompt: "Multiple choice",
       required: false,
@@ -44,6 +52,7 @@ const attempt: PublicAttemptState = {
           position: 1,
           label:
             "A longer answer label that can wrap naturally onto another line",
+          destination: { type: "NEXT" },
         },
       ],
     },

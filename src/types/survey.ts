@@ -13,11 +13,21 @@ export const QUESTION_TYPES = [
 ] as const;
 export type QuestionType = (typeof QUESTION_TYPES)[number];
 
+export type BranchDestination =
+  { type: "NEXT" } | { type: "QUESTION"; questionId: string } | { type: "END" };
+
+export type SurveyOptionInput = {
+  id: string;
+  label: string;
+  destination: BranchDestination;
+};
+
 export type SurveyQuestionInput = {
+  id: string;
   prompt: string;
   type: QuestionType;
   required: boolean;
-  options: string[];
+  options: SurveyOptionInput[];
 };
 
 export type SurveyDraftInput = {
@@ -45,5 +55,5 @@ export type SurveySummary = {
 };
 
 export type SurveyDetail = SurveySummary & {
-  questions: Array<SurveyQuestionInput & { id: string; position: number }>;
+  questions: Array<SurveyQuestionInput & { position: number }>;
 };

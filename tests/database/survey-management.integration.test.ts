@@ -22,17 +22,24 @@ const admin: EmployeePrincipal = {
   displayName: "Phase 5 Admin",
   role: "ADMIN",
 };
+const option = (label: string) => ({
+  id: randomUUID(),
+  label,
+  destination: { type: "NEXT" as const },
+});
 const input = {
   title: "Phase 5 survey",
   description: "Synthetic",
   questions: [
     {
+      id: randomUUID(),
       prompt: "Choose one",
       type: "SINGLE_CHOICE" as const,
       required: true,
-      options: ["First", "Second"],
+      options: [option("First"), option("Second")],
     },
     {
+      id: randomUUID(),
       prompt: "Comment",
       type: "FREE_TEXT" as const,
       required: false,
@@ -65,7 +72,10 @@ describe("Phase 5 survey persistence", () => {
     });
     expect(survey.publicId).toMatch(/^[A-Za-z0-9_-]{22}$/);
     expect(survey.questions.map((q) => q.position)).toEqual([1, 2]);
-    expect(survey.questions[0]?.options).toEqual(["First", "Second"]);
+    expect(survey.questions[0]?.options.map((value) => value.label)).toEqual([
+      "First",
+      "Second",
+    ]);
   });
   it("rolls back the entire replacement when a database invariant fails", async () => {
     const before = await service.view(owner, surveyId);
@@ -75,9 +85,11 @@ describe("Phase 5 survey persistence", () => {
         [randomUUID(), before.questions[0]!.id, surveyId],
       ),
     ).rejects.toBeTruthy();
-    expect((await service.view(owner, surveyId)).questions[0]?.options).toEqual(
-      ["First", "Second"],
-    );
+    expect(
+      (await service.view(owner, surveyId)).questions[0]?.options.map(
+        (value) => value.label,
+      ),
+    ).toEqual(["First", "Second"]);
   });
   it("activates, audits, rejects stale transitions, and freezes mutation", async () => {
     await service.transition(owner, surveyId, "ACTIVE", 1);

@@ -55,7 +55,7 @@ describe("Phase 11 export UI", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows separate Researcher/Admin respondent export choices and partition guidance", () => {
+  it("shows PDF and XLSX actions without the technical export explanation", () => {
     render(
       <SurveyResults
         surveyId="survey"
@@ -76,12 +76,16 @@ describe("Phase 11 export UI", () => {
       "href",
       "/api/surveys/survey/exports/free-text?questionPosition=1",
     );
-    expect(screen.getByText(/deterministic bounded parts/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Generate PDF" })).toHaveAttribute(
+      "href",
+      "/api/surveys/survey/results/pdf?snapshotNumber=2",
+    );
     expect(
-      screen.getByText(/timestamped current-state files/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/download the remaining files/),
-    ).toBeInTheDocument();
+      screen.queryByText(/deterministic bounded parts/),
+    ).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Current Raw export part")).toHaveValue(1);
+    expect(screen.getByLabelText("Archived Attempts export part")).toHaveValue(
+      1,
+    );
   });
 });

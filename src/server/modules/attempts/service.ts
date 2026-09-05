@@ -16,6 +16,7 @@ import type {
   PublicQuestion,
   PublicSubmitResult,
 } from "@/types/public-survey";
+import { pruneUnreachableAnswers, reachableQuestions } from "./branching";
 
 const TOKEN_PATTERN = /^[A-Za-z0-9_-]{43}$/;
 type Payload = { answers: Record<string, Exclude<PublicAnswerValue, null>> };
@@ -82,16 +83,23 @@ export class PublicAttemptService {
           await client.query("COMMIT");
           return { ...this.state(row, questions), conflict: true };
         }
-        const question = questions.find(
+        const currentPayload = this.payload(row);
+        const currentlyReachable = reachableQuestions(
+          questions,
+          currentPayload.answers,
+        );
+        const question = currentlyReachable.find(
           (item) => item.position === mutation.questionPosition,
         );
         if (!question) throw invalid();
         const value = validateValue(question, mutation.value);
-        const payload = this.payload(row);
+        const payload = currentPayload;
         const key = String(question.position);
         const previous = payload.answers[key];
         if (value === null) delete payload.answers[key];
         else payload.answers[key] = value;
+        payload.answers = pruneUnreachableAnswers(questions, payload.answers);
+        const reachable = reachableQuestions(questions, payload.answers);
         const changed =
           JSON.stringify(previous ?? null) !== JSON.stringify(value);
         if (!changed) {
@@ -107,8 +115,8 @@ export class PublicAttemptService {
         const updated = await client.query<AttemptRow>(
           `UPDATE response_attempts SET payload_ciphertext=$2,payload_nonce=$3,payload_key_version=$4,
              revision=revision+1,save_count=save_count+1,last_mutation_id=$5,
-             answered_question_count=$6,started_at=COALESCE(started_at,$7),last_activity_at=$7,last_answer_changed_at=$7
-           WHERE id=$1 AND revision=$8 RETURNING *, (SELECT title FROM surveys WHERE id=survey_id) title,
+             answered_question_count=$6,coverage_basis_count=$7,started_at=COALESCE(started_at,$8),last_activity_at=$8,last_answer_changed_at=$8
+           WHERE id=$1 AND revision=$9 RETURNING *, (SELECT title FROM surveys WHERE id=survey_id) title,
              (SELECT description FROM surveys WHERE id=survey_id) description,
              (SELECT status FROM surveys WHERE id=survey_id) survey_status,
              (SELECT pause_reason FROM surveys WHERE id=survey_id) survey_pause_reason`,
@@ -119,6 +127,7 @@ export class PublicAttemptService {
             envelope.keyVersion,
             mutation.mutationId,
             Object.keys(payload.answers).length,
+            reachable.length,
             now,
             row.revision,
           ],
@@ -161,7 +170,11 @@ export class PublicAttemptService {
         )
           throw conflict("A newer response state is available. Please retry.");
         const answers = this.payload(row).answers;
-        const missingRequiredPositions = questions
+        const reachable = reachableQuestions(
+          questions,
+          this.payload(row).answers,
+        );
+        const missingRequiredPositions = reachable
           .filter(
             (q) => q.required && answers[String(q.position)] === undefined,
           )
@@ -172,7 +185,7 @@ export class PublicAttemptService {
           : {
               submitted: true,
               analyticallyComplete:
-                Object.keys(answers).length === questions.length,
+                Object.keys(answers).length === reachable.length,
             };
       } catch (error) {
         await client.query("ROLLBACK");
@@ -203,14 +216,18 @@ export class PublicAttemptService {
     surveyId: string,
   ): Promise<PublicQuestion[]> {
     const rows = await client.query<{
+      id: string;
       position: number;
       type: PublicQuestion["type"];
       prompt: string;
       required: boolean;
       option_position: number | null;
       option_label: string | null;
+      option_destination_id: string | null;
+      option_ends_survey: boolean | null;
     }>(
-      `SELECT q.position,q.type,q.prompt,q.required,o.position option_position,o.label option_label FROM questions q
+      `SELECT q.id,q.position,q.type,q.prompt,q.required,o.position option_position,o.label option_label,
+        o.branch_destination_question_id option_destination_id,o.branch_ends_survey option_ends_survey FROM questions q
        LEFT JOIN answer_options o ON o.question_id=q.id WHERE q.survey_id=$1 ORDER BY q.position,o.position`,
       [surveyId],
     );
@@ -220,6 +237,7 @@ export class PublicAttemptService {
       if (!q) {
         q = {
           position: row.position,
+          id: row.id,
           type: row.type,
           prompt: row.prompt,
           required: row.required,
@@ -231,6 +249,11 @@ export class PublicAttemptService {
         q.options.push({
           position: row.option_position,
           label: row.option_label!,
+          destination: row.option_ends_survey
+            ? { type: "END" }
+            : row.option_destination_id
+              ? { type: "QUESTION", questionId: row.option_destination_id }
+              : { type: "NEXT" },
         });
     }
     return [...map.values()];
@@ -271,7 +294,7 @@ export class PublicAttemptService {
       generation: row.generation,
       revision: row.revision,
       answers: this.payload(row).answers,
-      questions,
+      questions: reachableQuestions(questions, this.payload(row).answers),
       editable,
       recorded:
         row.status !== "CURRENT" ||

@@ -140,6 +140,28 @@ describe("Phase 1 CockroachDB schema", () => {
     );
   });
 
+  it("stores optional forward-branch destinations without changing default next flow", async () => {
+    const row = await client.query(
+      `INSERT INTO answer_options
+       (id,question_id,survey_id,position,label,branch_destination_question_id,updated_at)
+       VALUES (gen_random_uuid(),$1,$2,1,'Continue',NULL,$3)
+       RETURNING branch_destination_question_id,branch_ends_survey`,
+      [syntheticIds.questionA, syntheticIds.surveyA, syntheticNow],
+    );
+    expect(row.rows[0]).toEqual({
+      branch_destination_question_id: null,
+      branch_ends_survey: false,
+    });
+    await rejectsConstraint(() =>
+      client.query(
+        `INSERT INTO answer_options
+         (id,question_id,survey_id,position,label,branch_destination_question_id,branch_ends_survey,updated_at)
+         VALUES (gen_random_uuid(),$1,$2,2,'Invalid',$1,true,$3)`,
+        [syntheticIds.questionA, syntheticIds.surveyA, syntheticNow],
+      ),
+    );
+  });
+
   it("defines exact enum values", async () => {
     const result = await client.query(
       `SELECT t.typname, e.enumlabel

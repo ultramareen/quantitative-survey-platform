@@ -21,11 +21,16 @@ export type PublicIdentityResult = {
 
 export type PublicAnswerValue = number | number[] | string | null;
 export type PublicQuestion = {
+  id: string;
   position: number;
   type: "SINGLE_CHOICE" | "MULTIPLE_CHOICE" | "FREE_TEXT";
   prompt: string;
   required: boolean;
-  options: { position: number; label: string }[];
+  options: {
+    position: number;
+    label: string;
+    destination: { type: "NEXT" | "END" | "QUESTION"; questionId?: string };
+  }[];
 };
 export type PublicAttemptState = {
   title: string;

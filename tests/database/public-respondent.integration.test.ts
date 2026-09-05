@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import pg from "pg";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { VersionedKeyRegistry } from "@/server/modules/cryptography/key-registry";
@@ -72,18 +73,29 @@ describe("Phase 6 public opens and encrypted respondent identity", () => {
         description: "Identity foundation",
         questions: [
           {
+            id: randomUUID(),
             prompt: "Pick one",
             type: "SINGLE_CHOICE",
             required: true,
-            options: ["Alpha", "Beta"],
+            options: ["Alpha", "Beta"].map((label) => ({
+              id: randomUUID(),
+              label,
+              destination: { type: "NEXT" as const },
+            })),
           },
           {
+            id: randomUUID(),
             prompt: "Pick many",
             type: "MULTIPLE_CHOICE",
             required: false,
-            options: ["Red", "Blue"],
+            options: ["Red", "Blue"].map((label) => ({
+              id: randomUUID(),
+              label,
+              destination: { type: "NEXT" as const },
+            })),
           },
           {
+            id: randomUUID(),
             prompt: "Comment",
             type: "FREE_TEXT",
             required: false,

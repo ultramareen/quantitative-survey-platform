@@ -232,13 +232,15 @@ model Question {
 }
 
 model AnswerOption {
-  id         String   @id @default(uuid()) @db.Uuid
-  questionId String   @map("question_id") @db.Uuid
-  surveyId   String   @map("survey_id") @db.Uuid
-  position   Int      @db.Int2
-  label      String   @db.String(1000)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id                          String   @id @default(uuid()) @db.Uuid
+  questionId                  String   @map("question_id") @db.Uuid
+  surveyId                    String   @map("survey_id") @db.Uuid
+  position                    Int      @db.Int2
+  label                       String   @db.String(1000)
+  branchDestinationQuestionId String?  @map("branch_destination_question_id") @db.Uuid
+  branchEndsSurvey            Boolean  @default(false) @map("branch_ends_survey")
+  createdAt                   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   question Question @relation(fields: [questionId, surveyId], references: [id, surveyId], onDelete: Restrict, onUpdate: Restrict)
 

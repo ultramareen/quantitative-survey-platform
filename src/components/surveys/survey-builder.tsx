@@ -8,11 +8,17 @@ import type {
   SurveyDraftInput,
 } from "@/types/survey";
 
+const blankOption = () => ({
+  id: crypto.randomUUID(),
+  label: "",
+  destination: { type: "NEXT" as const },
+});
 const blankQuestion = (): SurveyDraftInput["questions"][number] => ({
+  id: crypto.randomUUID(),
   prompt: "",
   type: "SINGLE_CHOICE",
   required: false,
-  options: ["", ""],
+  options: [blankOption(), blankOption()],
 });
 
 export function SurveyBuilder({
@@ -26,7 +32,8 @@ export function SurveyBuilder({
   const [title, setTitle] = useState(survey?.title ?? "");
   const [description, setDescription] = useState(survey?.description ?? "");
   const [questions, setQuestions] = useState<SurveyDraftInput["questions"]>(
-    survey?.questions.map(({ prompt, type, required, options }) => ({
+    survey?.questions.map(({ id, prompt, type, required, options }) => ({
+      id,
       prompt,
       type,
       required,
@@ -48,7 +55,7 @@ export function SurveyBuilder({
     description.length <= 4000 &&
     questions.length >= 1 &&
     questions.every(
-      (question) =>
+      (question, questionIndex) =>
         question.prompt.trim().length > 0 &&
         question.prompt.trim().length <= 4000 &&
         (question.type === "FREE_TEXT"
@@ -57,7 +64,9 @@ export function SurveyBuilder({
             question.options.length <= 11 &&
             question.options.every(
               (option) =>
-                option.trim().length > 0 && option.trim().length <= 1000,
+                option.label.trim().length > 0 &&
+                option.label.trim().length <= 1000 &&
+                validDestination(option.destination, questions, questionIndex),
             )),
     );
   function changeQuestion(
@@ -222,7 +231,7 @@ export function SurveyBuilder({
           }`}
           data-question-index={index}
           draggable
-          key={index}
+          key={question.id}
           onDragEnd={() => setDraggedQuestion(undefined)}
           onDragOver={(event) => {
             if (
@@ -283,8 +292,14 @@ export function SurveyBuilder({
                         type === "FREE_TEXT"
                           ? []
                           : question.options.length
-                            ? question.options
-                            : ["", ""],
+                            ? question.options.map((option) => ({
+                                ...option,
+                                destination:
+                                  type === "SINGLE_CHOICE"
+                                    ? option.destination
+                                    : ({ type: "NEXT" } as const),
+                              }))
+                            : [blankOption(), blankOption()],
                     });
                   }}
                 >
@@ -320,7 +335,7 @@ export function SurveyBuilder({
                     data-option-draggable
                     data-option-index={optionIndex}
                     draggable
-                    key={optionIndex}
+                    key={option.id}
                     onDragEnd={(event) => {
                       event.stopPropagation();
                       setDraggedOption(undefined);
@@ -367,15 +382,70 @@ export function SurveyBuilder({
                       className="min-w-0 flex-1 rounded-lg border px-3 py-2"
                       required
                       maxLength={1000}
-                      value={option}
+                      value={option.label}
                       onChange={(e) =>
                         changeQuestion(index, {
                           options: question.options.map((v, i) =>
-                            i === optionIndex ? e.target.value : v,
+                            i === optionIndex
+                              ? { ...v, label: e.target.value }
+                              : v,
                           ),
                         })
                       }
                     />
+                    {question.type === "SINGLE_CHOICE" ? (
+                      <select
+                        aria-label={`Destination for option ${optionIndex + 1}`}
+                        className="rounded-lg border px-2 py-2 text-sm"
+                        value={
+                          option.destination.type === "QUESTION"
+                            ? `QUESTION:${option.destination.questionId}`
+                            : option.destination.type
+                        }
+                        onChange={(event) => {
+                          const raw = event.target.value;
+                          const destination = raw.startsWith("QUESTION:")
+                            ? {
+                                type: "QUESTION" as const,
+                                questionId: raw.slice(9),
+                              }
+                            : raw === "END"
+                              ? { type: "END" as const }
+                              : { type: "NEXT" as const };
+                          changeQuestion(index, {
+                            options: question.options.map((value, i) =>
+                              i === optionIndex
+                                ? { ...value, destination }
+                                : value,
+                            ),
+                          });
+                        }}
+                      >
+                        {!validDestination(
+                          option.destination,
+                          questions,
+                          index,
+                        ) ? (
+                          <option
+                            value={`QUESTION:${destinationQuestionId(option.destination)}`}
+                          >
+                            Invalid destination — choose a later question
+                          </option>
+                        ) : null}
+                        <option value="NEXT">Continue to next question</option>
+                        {questions
+                          .slice(index + 1)
+                          .map((candidate, laterIndex) => (
+                            <option
+                              key={candidate.id}
+                              value={`QUESTION:${candidate.id}`}
+                            >
+                              Go to question {index + laterIndex + 2}
+                            </option>
+                          ))}
+                        <option value="END">End survey</option>
+                      </select>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() =>
@@ -404,7 +474,7 @@ export function SurveyBuilder({
                   disabled={question.options.length >= 11}
                   onClick={() =>
                     changeQuestion(index, {
-                      options: [...question.options, ""],
+                      options: [...question.options, blankOption()],
                     })
                   }
                   className="ui-primary px-3 py-1.5 disabled:opacity-50"
@@ -515,7 +585,14 @@ function ReadOnlyQuestions({ survey }: { survey: SurveyDetail }) {
           {question.options.length ? (
             <ol className="mt-3 list-decimal pl-6">
               {question.options.map((option) => (
-                <li key={option}>{option}</li>
+                <li key={option.id}>
+                  {option.label}
+                  {option.destination.type === "END"
+                    ? " → End survey"
+                    : option.destination.type === "QUESTION"
+                      ? ` → Question ${survey.questions.find((candidate) => candidate.id === destinationQuestionId(option.destination))?.position ?? "missing"}`
+                      : ""}
+                </li>
               ))}
             </ol>
           ) : null}
@@ -523,4 +600,22 @@ function ReadOnlyQuestions({ survey }: { survey: SurveyDetail }) {
       ))}
     </div>
   );
+}
+
+function validDestination(
+  destination: SurveyDraftInput["questions"][number]["options"][number]["destination"],
+  questions: SurveyDraftInput["questions"],
+  currentIndex: number,
+) {
+  return (
+    destination.type !== "QUESTION" ||
+    questions.findIndex((question) => question.id === destination.questionId) >
+      currentIndex
+  );
+}
+
+function destinationQuestionId(
+  destination: SurveyDraftInput["questions"][number]["options"][number]["destination"],
+) {
+  return destination.type === "QUESTION" ? destination.questionId : "";
 }

@@ -77,9 +77,13 @@ export class PgSurveyRepository implements SurveyRepository {
       prompt: string;
       required: boolean;
       option_position: number | null;
+      option_id: string | null;
       option_label: string | null;
+      branch_destination_question_id: string | null;
+      branch_ends_survey: boolean | null;
     }>(
-      `SELECT q.id, q.position, q.type, q.prompt, q.required, o.position AS option_position, o.label AS option_label
+      `SELECT q.id, q.position, q.type, q.prompt, q.required, o.id AS option_id, o.position AS option_position, o.label AS option_label,
+              o.branch_destination_question_id, o.branch_ends_survey
          FROM questions q LEFT JOIN answer_options o ON o.question_id = q.id AND o.survey_id = q.survey_id
         WHERE q.survey_id = $1 ORDER BY q.position, o.position`,
       [id],
@@ -98,7 +102,19 @@ export class PgSurveyRepository implements SurveyRepository {
         };
         grouped.set(row.id, question);
       }
-      if (row.option_label !== null) question.options.push(row.option_label);
+      if (row.option_label !== null && row.option_id !== null)
+        question.options.push({
+          id: row.option_id,
+          label: row.option_label,
+          destination: row.branch_ends_survey
+            ? { type: "END" }
+            : row.branch_destination_question_id
+              ? {
+                  type: "QUESTION",
+                  questionId: row.branch_destination_question_id,
+                }
+              : { type: "NEXT" },
+        });
     }
     return { ...summary(result.rows[0]), questions: [...grouped.values()] };
   }
@@ -155,14 +171,7 @@ export class PgSurveyRepository implements SurveyRepository {
       {
         title: `${source.title} (Copy)`.slice(0, 300),
         description: source.description,
-        questions: source.questions.map(
-          ({ prompt, type, required, options }) => ({
-            prompt,
-            type,
-            required,
-            options,
-          }),
-        ),
+        questions: duplicateQuestionnaire(source.questions),
       },
       publicId,
     );
@@ -210,7 +219,13 @@ export class PgSurveyRepository implements SurveyRepository {
             );
         }
         const invalid = await client.query<{ count: string }>(
-          `SELECT count(*)::STRING AS count FROM questions q WHERE q.survey_id=$1 AND ((q.type='FREE_TEXT' AND EXISTS (SELECT 1 FROM answer_options o WHERE o.question_id=q.id)) OR (q.type IN ('SINGLE_CHOICE','MULTIPLE_CHOICE') AND (SELECT count(*) FROM answer_options o WHERE o.question_id=q.id) NOT BETWEEN 2 AND 11))`,
+          `SELECT count(*)::STRING AS count FROM questions q WHERE q.survey_id=$1 AND (
+            (q.type='FREE_TEXT' AND EXISTS (SELECT 1 FROM answer_options o WHERE o.question_id=q.id)) OR
+            (q.type IN ('SINGLE_CHOICE','MULTIPLE_CHOICE') AND (SELECT count(*) FROM answer_options o WHERE o.question_id=q.id) NOT BETWEEN 2 AND 11) OR
+            (q.type <> 'SINGLE_CHOICE' AND EXISTS (SELECT 1 FROM answer_options o WHERE o.question_id=q.id AND (o.branch_ends_survey OR o.branch_destination_question_id IS NOT NULL))) OR
+            EXISTS (SELECT 1 FROM answer_options o LEFT JOIN questions d ON d.id=o.branch_destination_question_id AND d.survey_id=q.survey_id
+              WHERE o.question_id=q.id AND o.branch_destination_question_id IS NOT NULL AND (d.id IS NULL OR d.position <= q.position))
+          )`,
           [input.surveyId],
         );
         if (
@@ -286,6 +301,29 @@ export class PgSurveyRepository implements SurveyRepository {
   }
 }
 
+export function duplicateQuestionnaire(questions: SurveyDetail["questions"]) {
+  const questionIds = new Map(
+    questions.map((question) => [question.id, randomUUID()]),
+  );
+  return questions.map(({ id, prompt, type, required, options }) => ({
+    id: questionIds.get(id)!,
+    prompt,
+    type,
+    required,
+    options: options.map((option) => ({
+      id: randomUUID(),
+      label: option.label,
+      destination:
+        option.destination.type === "QUESTION"
+          ? {
+              type: "QUESTION" as const,
+              questionId: questionIds.get(option.destination.questionId)!,
+            }
+          : option.destination,
+    })),
+  }));
+}
+
 function baseSelect() {
   return `SELECT s.id,s.public_id,s.owner_id,u.display_name AS owner_name,s.title,s.description,s.status,s.pause_reason,s.state_version,s.question_count,s.created_at,s.updated_at,s.launched_at,s.paused_at,s.completed_at FROM surveys s JOIN users u ON u.id=s.owner_id`;
 }
@@ -314,7 +352,7 @@ async function writeQuestions(
   questions: SurveyDraftInput["questions"],
 ) {
   for (const [index, question] of questions.entries()) {
-    const questionId = randomUUID();
+    const questionId = question.id;
     await client.query(
       `INSERT INTO questions (id,survey_id,position,type,prompt,required,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,now(),now())`,
       [
@@ -326,10 +364,20 @@ async function writeQuestions(
         question.required,
       ],
     );
-    for (const [optionIndex, label] of question.options.entries())
+    for (const [optionIndex, option] of question.options.entries())
       await client.query(
-        `INSERT INTO answer_options (id,question_id,survey_id,position,label,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,now(),now())`,
-        [randomUUID(), questionId, surveyId, optionIndex + 1, label],
+        `INSERT INTO answer_options (id,question_id,survey_id,position,label,branch_destination_question_id,branch_ends_survey,created_at,updated_at) VALUES ($1,$2,$3,$4,$5,$6,$7,now(),now())`,
+        [
+          option.id,
+          questionId,
+          surveyId,
+          optionIndex + 1,
+          option.label,
+          option.destination.type === "QUESTION"
+            ? option.destination.questionId
+            : null,
+          option.destination.type === "END",
+        ],
       );
   }
 }

@@ -101,35 +101,30 @@ function Snapshot({
         Snapshot {snapshot.snapshotNumber} · cutoff{" "}
         {new Date(snapshot.dataCutoffAt).toLocaleString()}
       </p>
-      <div className="mt-4 rounded-lg border bg-slate-50 p-4">
-        <h3 className="font-semibold">XLSX exports</h3>
-        <p className="mt-1 text-sm text-slate-600">
-          Snapshot exports use the displayed immutable cutoff. Current,
-          archived, and free-text exports are timestamped current-state files.
-          Large datasets are split into deterministic bounded parts; each file
-          identifies its part and export time. When a workbook reports more than
-          one part, download the remaining files from the same export URL by
-          adding <code>?part=2</code>, then 3, through the reported total (or{" "}
-          <code>&amp;part=2</code> when the URL already has a question or
-          snapshot parameter).
-        </p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <ExportLink
-            href={`/api/surveys/${surveyId}/exports/aggregate?snapshotNumber=${snapshot.snapshotNumber}`}
-          >
-            Aggregate snapshot
-          </ExportLink>
-          {canExportRespondents ? (
-            <>
-              <ExportLink href={`/api/surveys/${surveyId}/exports/current`}>
-                Current Raw
-              </ExportLink>
-              <ExportLink href={`/api/surveys/${surveyId}/exports/archived`}>
-                Archived Attempts
-              </ExportLink>
-            </>
-          ) : null}
-        </div>
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <ExportLink
+          className="ui-primary"
+          href={`/api/surveys/${surveyId}/results/pdf?snapshotNumber=${snapshot.snapshotNumber}`}
+        >
+          Generate PDF
+        </ExportLink>
+        <ExportLink
+          href={`/api/surveys/${surveyId}/exports/aggregate?snapshotNumber=${snapshot.snapshotNumber}`}
+        >
+          Aggregate snapshot
+        </ExportLink>
+        {canExportRespondents ? (
+          <>
+            <MultipartExport
+              href={`/api/surveys/${surveyId}/exports/current`}
+              label="Current Raw"
+            />
+            <MultipartExport
+              href={`/api/surveys/${surveyId}/exports/archived`}
+              label="Archived Attempts"
+            />
+          </>
+        ) : null}
       </div>
       <div className="mt-4 overflow-x-auto">
         <table className="w-full text-left">
@@ -226,9 +221,31 @@ function ExportLink({
   return (
     <a
       href={href}
-      className={`rounded-lg border border-blue-700 px-3 py-2 text-sm font-medium text-blue-800 hover:bg-blue-50 ${className}`}
+      className={`rounded-lg border px-3 py-2 text-sm font-medium ${className || "ui-secondary"}`}
     >
       {children}
     </a>
+  );
+}
+
+function MultipartExport({ href, label }: { href: string; label: string }) {
+  const [part, setPart] = useState(1);
+  return (
+    <span className="inline-flex items-center gap-1">
+      <ExportLink href={`${href}?part=${part}`}>{label}</ExportLink>
+      <label className="ui-muted text-xs">
+        Part{" "}
+        <input
+          aria-label={`${label} export part`}
+          className="ui-input w-14 px-2 py-2"
+          min={1}
+          type="number"
+          value={part}
+          onChange={(event) =>
+            setPart(Math.max(1, Number(event.target.value) || 1))
+          }
+        />
+      </label>
+    </span>
   );
 }

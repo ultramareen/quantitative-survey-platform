@@ -233,6 +233,31 @@ export class ResultsService {
     );
     return rows.rows.map((row) => this.dto(row, this.decryptFreeText(row)));
   }
+  async report(
+    actor: EmployeePrincipal | null,
+    surveyId: string,
+    snapshotNumber: number,
+  ) {
+    if (!actor) throw denied();
+    if (!Number.isInteger(snapshotNumber) || snapshotNumber < 1)
+      throw unavailable();
+    const result = await this.pool.query<any>(
+      `SELECT rs.*,s.title survey_title,s.launched_at
+       FROM results_snapshots rs JOIN surveys s ON s.id=rs.survey_id
+       WHERE rs.survey_id=$1 AND rs.snapshot_number=$2 AND s.tombstoned_at IS NULL
+         AND s.status IN ('ACTIVE','PENDING_CAPACITY','COMPLETED')`,
+      [surveyId, snapshotNumber],
+    );
+    const row = result.rows[0];
+    if (!row) throw unavailable();
+    return {
+      surveyTitle: row.survey_title as string,
+      launchedAt: row.launched_at
+        ? new Date(row.launched_at).toISOString()
+        : null,
+      snapshot: this.dto(row, this.decryptFreeText(row)),
+    };
+  }
   private async authorize(actor: EmployeePrincipal | null, surveyId: string) {
     if (!actor) throw denied();
     const result = await this.pool.query<{

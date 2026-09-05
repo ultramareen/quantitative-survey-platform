@@ -52,6 +52,101 @@ describe("survey builder UI", () => {
     expect(screen.getByText("Answer options (3/11)")).toBeInTheDocument();
   });
 
+  it("offers forward-only destinations for single-choice options", () => {
+    const branchingDraft: SurveyDetail = {
+      ...draft,
+      questionCount: 3,
+      questions: [
+        {
+          id: "q1",
+          position: 1,
+          prompt: "Route",
+          type: "SINGLE_CHOICE",
+          required: true,
+          options: [
+            { id: "o1", label: "Continue", destination: { type: "NEXT" } },
+            {
+              id: "o2",
+              label: "Skip",
+              destination: { type: "QUESTION", questionId: "q3" },
+            },
+          ],
+        },
+        {
+          id: "q2",
+          position: 2,
+          prompt: "Middle",
+          type: "FREE_TEXT",
+          required: false,
+          options: [],
+        },
+        {
+          id: "q3",
+          position: 3,
+          prompt: "Last",
+          type: "FREE_TEXT",
+          required: false,
+          options: [],
+        },
+      ],
+    };
+    render(<SurveyBuilder survey={branchingDraft} />);
+    const destination = screen.getByLabelText("Destination for option 1");
+    expect(
+      within(destination).getByRole("option", { name: "Go to question 2" }),
+    ).toBeInTheDocument();
+    expect(
+      within(destination).getByRole("option", { name: "Go to question 3" }),
+    ).toBeInTheDocument();
+    expect(
+      within(destination).getByRole("option", { name: "End survey" }),
+    ).toBeInTheDocument();
+    expect(
+      within(destination).queryByRole("option", { name: "Go to question 1" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("surfaces an invalidated backward destination for resolution", () => {
+    render(
+      <SurveyBuilder
+        survey={{
+          ...draft,
+          title: "Reordered",
+          questionCount: 2,
+          questions: [
+            {
+              id: "q1",
+              position: 1,
+              prompt: "Old earlier destination",
+              type: "FREE_TEXT",
+              required: false,
+              options: [],
+            },
+            {
+              id: "q2",
+              position: 2,
+              prompt: "Moved later source",
+              type: "SINGLE_CHOICE",
+              required: false,
+              options: [
+                {
+                  id: "o1",
+                  label: "Invalid branch",
+                  destination: { type: "QUESTION", questionId: "q1" },
+                },
+                { id: "o2", label: "Continue", destination: { type: "NEXT" } },
+              ],
+            },
+          ],
+        }}
+      />,
+    );
+    expect(
+      screen.getByText("Invalid destination — choose a later question"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Activate" })).toBeDisabled();
+  });
+
   it("keeps question controls together and places add-question before final actions", () => {
     const { container } = render(<SurveyBuilder />);
     fireEvent.click(screen.getByRole("button", { name: "Add question" }));
@@ -167,10 +262,11 @@ describe("survey builder UI", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save Draft" }));
     await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
     const request = fetchMock.mock.calls[0]![1]!;
-    expect(JSON.parse(String(request.body)).questions[0].options).toEqual([
-      "Second",
-      "First",
-    ]);
+    expect(
+      JSON.parse(String(request.body)).questions[0].options.map(
+        (option: { label: string }) => option.label,
+      ),
+    ).toEqual(["Second", "First"]);
     fetchMock.mockRestore();
   });
 
@@ -317,7 +413,18 @@ describe("survey builder UI", () => {
           prompt: "Old prompt",
           type: "SINGLE_CHOICE" as const,
           required: false,
-          options: ["Yes", "No"],
+          options: [
+            {
+              id: "option-1",
+              label: "Yes",
+              destination: { type: "NEXT" as const },
+            },
+            {
+              id: "option-2",
+              label: "No",
+              destination: { type: "NEXT" as const },
+            },
+          ],
         },
       ],
     };
