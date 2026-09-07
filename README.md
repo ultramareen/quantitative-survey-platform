@@ -1,43 +1,40 @@
 # Quantitative Survey Platform
 
-Approved Phase 0–3 foundation for the quantitative survey platform.
+A finished quantitative research platform with an internal employee workspace and a public, account-free respondent experience. It supports survey design, response collection, respondent management and reproducible results reporting.
 
-## Local setup
+## Employee workspace
 
-1. Use Node.js 20.9 or newer and pnpm 11.
-2. Copy `.env.example` to `.env.local` and replace every placeholder with local-only synthetic values.
-3. Run `pnpm install --frozen-lockfile`.
-4. Run `pnpm dev`.
+- Create and duplicate surveys with up to 50 Single Choice, Multiple Choice or Free Text questions; mark questions Required or Optional and reorder questions and options.
+- Configure Single Choice branching to the next question, a later question or the end of the survey. Routes are validated server-side, and answers made unreachable by a response change are removed.
+- Manage the survey lifecycle: Draft → Active → Paused → Active, or permanent completion into History. Activation freezes the questionnaire. Manual pauses block response writes; infrastructure pauses allow eligible existing attempts to continue.
+- Calculate immutable **Results Snapshots** on demand, with a consistent data cutoff and retained snapshot history. Opening Results does not recalculate results.
+- Download aggregate snapshot XLSX exports and landscape A4 PDF reports with question charts. Authorised Researcher and Admin users can also export current responses, archived attempts and respondent-level free-text XLSX files.
+- Find respondents by survey and exact Reference ID. Product Managers see aggregate results; Researcher and Admin roles can access respondent records and authorised PII.
 
-Development uses `MAIL_TRANSPORT=local-file`; password-reset messages are
-written to the ignored, local-only path in `LOCAL_MAILBOX_PATH`. Preview and
-production fail closed unless `MAIL_TRANSPORT=brevo` and deployment-managed
-Brevo credentials plus an individually verified sender are present.
+Survey owners and Admins control lifecycle changes and result calculation. Admins manage exact-email invitations, employee roles, disabling and re-enabling accounts, and bulk survey pauses. Invitations expire after 72 hours and are single-use. Administration enforces a maximum of 15 active employees and preserves at least one active Admin.
 
-## Initial Admin bootstrap
+## Respondent experience
 
-After applying the existing migrations to an empty database, create the first
-Admin from a trusted server terminal. Use synthetic local values during
-development and do not save the password in a checked-in environment file:
+Respondents open a public survey link on desktop or mobile, enter their name and phone, and answer only the questions on their reachable route. Answers autosave with save/retry feedback; pending changes retry after temporary connectivity loss. Submit validates reached Required questions.
 
-```sh
-QSP_BOOTSTRAP_EMAIL=admin@synthetic.invalid \
-QSP_BOOTSTRAP_DISPLAY_NAME="Synthetic Admin" \
-QSP_BOOTSTRAP_PASSWORD="replace-with-a-local-password" \
-pnpm auth:bootstrap
-```
+The same browser can resume and edit for 24 hours after the latest successfully saved answer change, while the survey permits edits. Before the first change, the window starts at attempt creation. Reopening or submitting does not extend it. On an active survey, a new device using the same phone starts a blank attempt and archives the previous one without revealing its answers.
 
-The command refuses to run once any user exists and records a safe audit event.
-There is no public bootstrap, registration, or employee invitation endpoint in
-Phase 3.
+## Security and privacy
 
-`pnpm dev`, `pnpm build`, and `pnpm start` validate required server configuration before starting. Missing or malformed values fail closed without printing secret contents.
+Names, phones and answer payloads are encrypted before database persistence. A separate survey-scoped phone HMAC supports duplicate lookup. Server-side role checks gate PII decryption and exports; secure HttpOnly cookies identify respondent attempts. Sensitive actions and exports are audited, with rate limiting, origin/CSRF checks and private download caching controls.
 
-The three source-of-truth files under `docs/` are protected by `.frozen-docs.sha256`. Formatting, linting, and verification commands fail closed if any frozen byte changes, and automatic format/fix scopes exclude `docs/**`.
+Aggregate snapshots and PDF reports contain no respondent identity fields or respondent-to-answer links. Grouped free-text answers can still contain identifying text and remain confidential research content. Respondent data is not sent to Brevo, analytics SaaS, AI providers or session-replay services.
 
-## Verification
+## Technology
 
-Run `pnpm verify` to execute type checking, linting, formatting, unit and architecture tests, Prisma configuration validation, the production build, and the client-bundle secret scan.
+Next.js, React and TypeScript; Prisma with CockroachDB; Better Auth for employee authentication; Brevo for employee transactional email; Netlify hosting; pdfmake for PDF reports; Vitest and Playwright for testing.
 
-Survey authoring, invitations, respondent flows, results, exports, and
-infrastructure quota protection remain deferred to their approved later phases.
+## Product specification
+
+[PRD v1.1](docs/Quantitative_Survey_Platform_PRD_v1.1.docx) defines the current implemented product. [PRD v1.0](docs/Quantitative_Survey_Platform_PRD_v1.0.docx) is retained as a historical specification.
+
+## Local development
+
+Use Node.js 20.9 or newer and pnpm 11. Copy `.env.example` to `.env.local`, configure a separate development database and local-only secrets, then install dependencies with `pnpm install --frozen-lockfile` and start with `pnpm dev`. Apply the existing database migrations and bootstrap the first Admin with `pnpm auth:bootstrap` using local credentials before employee sign-in.
+
+Local development uses the local-file mail transport for employee email. Keep credentials and generated mailbox files out of Git.
